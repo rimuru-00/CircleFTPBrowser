@@ -217,6 +217,11 @@ body { display: flex; flex-direction: column; }
 }
 
 /* ─── Scroll content ─────────────────────────────────────────────────────── */
+#contentWrapper {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
 #content {
     flex: 1;
     overflow-y: auto;
@@ -224,6 +229,44 @@ body { display: flex; flex-direction: column; }
 }
 #content::-webkit-scrollbar { width: 2px; }
 #content::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ─── Alpha scroll bar ───────────────────────────────────────────────────── */
+#alphaBar {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 22px;
+    overflow-y: auto;
+    padding: 6px 0;
+    gap: 1px;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, rgba(139,92,246,.04) 0%, transparent 100%);
+}
+#alphaBar::-webkit-scrollbar { display: none; }
+.alpha-btn {
+    width: 18px; height: 18px;
+    font-size: 10px; font-weight: 700; line-height: 1;
+    color: var(--accent-lt);
+    background: none; border: none;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; cursor: pointer; flex-shrink: 0;
+    transition: background 0.1s, color 0.1s;
+    font-family: inherit;
+}
+.alpha-btn:active { background: var(--accent); color: #fff; }
+
+/* ─── Root count badge ───────────────────────────────────────────────────── */
+.root-count {
+    font-size: 11px; font-weight: 700;
+    color: var(--accent-lt);
+    background: rgba(139,92,246,.15);
+    border: 1px solid rgba(139,92,246,.2);
+    padding: 3px 8px; border-radius: 10px;
+    white-space: nowrap; flex-shrink: 0;
+    min-width: 20px; text-align: center;
+    transition: opacity 0.3s;
+}
 
 /* ─── Root cards ─────────────────────────────────────────────────────────── */
 .root-list { padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
@@ -473,8 +516,11 @@ body { display: flex; flex-direction: column; }
     </div>
 </div>
 
-<!-- ── Content ────────────────────────────────────────────────────────── -->
-<div id="content"></div>
+<!-- ── Content + Alpha bar ────────────────────────────────────────── -->
+<div id="contentWrapper">
+    <div id="content"></div>
+    <div id="alphaBar"></div>
+</div>
 
 <!-- ── History view ───────────────────────────────────────────────────── -->
 <div id="historyView"></div>
@@ -815,9 +861,11 @@ function showRoot() {
                 <div class="root-name">${esc(r.name)}</div>
                 <div class="root-desc">${esc(r.desc)}</div>
             </div>
+            <div id="rootCount_${i}" class="root-count" style="opacity:0"></div>
             <div class="farrow">›</div>
         </div>`).join('');
     setContent(`<div class="root-list">${buildContinueCard()}${cards}</div>`);
+    fetchRootCounts();
 }
 function buildContinueCard() {
     const last = loadLastFolder();
@@ -957,6 +1005,7 @@ function renderItems(allItems, query, fromSearch = false) {
     }).join('');
 
     setContent(`<div>${rows}</div>`, !fromSearch);
+    buildAlphaBar(allItems);
 }
 
 function clickItem(idx) {
@@ -1047,9 +1096,96 @@ function setContent(html, animate = true) {
     el.classList.remove('c-anim');
     el.innerHTML = html;
     el.scrollTop = 0;
-    // rAF avoids forcing a synchronous layout after writing innerHTML —
-    // browser does the layout in its own paint cycle, animation still plays
+    document.getElementById('alphaBar').style.display = 'none';
     if (animate) requestAnimationFrame(() => el.classList.add('c-anim'));
+}
+
+// ── ALPHA SCROLL BAR ──────────────────────────────────────────────────────────
+function buildAlphaBar(items) {
+    const bar = document.getElementById('alphaBar');
+    const folders = items.filter(i => i.isDir);
+
+    if (!folders.length || state.stack.length === 0 || state.searchQuery.trim()) {
+        bar.style.display = 'none';
+        return;
+    }
+
+    const letterMap = new Map();
+    folders.forEach(f => {
+        const ch = f.name.trim()[0];
+        if (!ch) return;
+        const key = /[A-Za-z]/.test(ch) ? ch.toUpperCase() : '#';
+        letterMap.set(key, (letterMap.get(key) || 0) + 1);
+    });
+
+    const letters = [];
+    if ((letterMap.get('#') || 0) >= 2) letters.push('#');
+    for (let c = 65; c <= 90; c++) {
+        const ch = String.fromCharCode(c);
+        if ((letterMap.get(ch) || 0) >= 2) letters.push(ch);
+    }
+
+    if (!letters.length) { bar.style.display = 'none'; return; }
+
+    bar.innerHTML = letters.map(l =>
+        `<button class="alpha-btn" onclick="jumpToAlpha('${l}')">${l}</button>`
+    ).join('');
+    bar.style.display = 'flex';
+}
+
+function jumpToAlpha(letter) {
+    const content = document.getElementById('content');
+    const fitems  = content.querySelectorAll('.fitem');
+    for (const el of fitems) {
+        if (!el.querySelector('.fi-dir')) continue;
+        const fname = el.querySelector('.fname');
+        if (!fname) continue;
+        const name = fname.textContent.trim();
+        if (!name) continue;
+        const firstCh = name[0];
+        const isMatch = letter === '#'
+            ? !/[A-Za-z]/.test(firstCh)
+            : firstCh.toUpperCase() === letter;
+        if (isMatch) {
+            const containerTop = content.getBoundingClientRect().top;
+            const elTop        = el.getBoundingClientRect().top;
+            content.scrollTop += elTop - containerTop;
+            break;
+        }
+    }
+}
+
+// ── ROOT COUNT ────────────────────────────────────────────────────────────────
+const ROOT_COUNT_KEY = 'cftp_rootCount_v1';
+const ROOT_COUNT_TTL = 30 * 60 * 1000;
+
+async function fetchRootCounts() {
+    try {
+        const cached = localStorage.getItem(ROOT_COUNT_KEY);
+        if (cached) {
+            const { counts, ts } = JSON.parse(cached);
+            if (Date.now() - ts < ROOT_COUNT_TTL) { updateRootCounts(counts); return; }
+        }
+    } catch (_) {}
+    try {
+        const counts = {};
+        for (const r of CONFIG.roots) {
+            const items = await fetchDirectory(r.url);
+            counts[r.url] = items.filter(i => i.isDir).length;
+        }
+        try { localStorage.setItem(ROOT_COUNT_KEY, JSON.stringify({ counts, ts: Date.now() })); } catch (_) {}
+        updateRootCounts(counts);
+    } catch (_) {}
+}
+
+function updateRootCounts(counts) {
+    CONFIG.roots.forEach((r, i) => {
+        const el = document.getElementById(`rootCount_${i}`);
+        if (el && counts[r.url] !== undefined) {
+            el.textContent = counts[r.url] + ' anime';
+            el.style.opacity = '1';
+        }
+    });
 }
 
 function setHeader(title, showSearch) {
