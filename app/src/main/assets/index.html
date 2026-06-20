@@ -599,15 +599,25 @@ function clearLastFolder() {
     try { localStorage.removeItem(STORAGE_KEYS.LAST_FOLDER); } catch (_) {}
 }
 
+// ── FOLDER CACHE ──────────────────────────────────────────────────────────────
+// Avoids re-fetching folders the user already visited. Back navigation and
+// breadcrumb jumps become instant. TTL = 5 min so stale content auto-expires.
+const _folderCache = new Map(); // url → { items, ts }
+const CACHE_TTL    = 5 * 60 * 1000;
+
 // ── PARSING ───────────────────────────────────────────────────────────────────
 function isVideoFile(name) {
     const lower = name.toLowerCase();
     return CONFIG.videoExts.some(ext => lower.endsWith(ext));
 }
 async function fetchDirectory(url) {
+    const hit = _folderCache.get(url);
+    if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.items;
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return parseH5aiHtml(await res.text(), url);
+    const items = parseH5aiHtml(await res.text(), url);
+    _folderCache.set(url, { items, ts: Date.now() });
+    return items;
 }
 function parseH5aiHtml(html, baseUrl) {
     const origin = new URL(baseUrl).origin;
@@ -677,18 +687,22 @@ function formatSize(raw) {
 // ── SEARCH ────────────────────────────────────────────────────────────────────
 
 /**
- * Fuzzy word match — every typed word must appear somewhere in the name.
- * Also tests against a normalized version (spaces/dashes stripped) so
+ * Fuzzy word match using pre-normalized item fields (_lname, _lnorm).
+ * `pairs` is [[word, wordNorm], ...] built once per render pass in renderItems.
  * "rezero" matches "Re Zero", "attackontitan" matches "Attack on Titan", etc.
  */
+function matchesItem(item, pairs) {
+    if (!pairs.length) return true;
+    return pairs.every(([w, wNorm]) =>
+        item._lname.includes(w) || item._lnorm.includes(wNorm)
+    );
+}
+// Keep old name as thin wrapper for any callers that pass raw words
 function matchesWords(name, words) {
     if (!words.length) return true;
-    const lName = name.toLowerCase();
-    const lNorm = lName.replace(/[\s\-_.]+/g, ''); // strip separators
-    return words.every(w => {
-        const wNorm = w.replace(/[\s\-_.]+/g, '');
-        return lName.includes(w) || lNorm.includes(wNorm);
-    });
+    const lname = name.toLowerCase();
+    const lnorm = lname.replace(/[\s\-_.]+/g, '');
+    return words.every(w => lname.includes(w) || lnorm.includes(w.replace(/[\s\-_.]+/g, '')));
 }
 
 function buildHighlightRegex(query) {
@@ -717,10 +731,12 @@ function openSearch() {
     document.getElementById('searchClose').classList.add('visible');
     const inp = document.getElementById('searchInput');
     inp.value = '';
-    inp.focus();
-    renderCurrentItems();
+    // Defer focus so the open animation runs first, then keyboard appears
+    requestAnimationFrame(() => inp.focus());
+    // No re-render needed — items are already showing unfiltered
 }
 function closeSearch() {
+    const hadQuery = !!state.searchQuery.trim();
     state.searchActive = false;
     state.searchQuery  = '';
     document.getElementById('searchInput').value = '';
@@ -731,7 +747,9 @@ function closeSearch() {
     document.getElementById('hdrBadge').style.display   = '';
     if (state.stack.length > 0)
         document.getElementById('searchBtn').style.display = '';
-    renderCurrentItems();
+    // Only re-render if search was actually filtering — otherwise items
+    // are already showing the full unfiltered list, no DOM work needed
+    if (hadQuery) renderCurrentItems();
 }
 function clearSearch() {
     document.getElementById('searchInput').value = '';
@@ -826,6 +844,12 @@ async function browse(url, title) {
     setContent(`<div class="state-center"><div class="spinner"></div><span>Loading…</span></div>`);
     try {
         const items = await fetchDirectory(url);
+        // Pre-compute lowercase + separator-stripped names once on load.
+        // matchesWords reuses these instead of recomputing on every keystroke.
+        items.forEach(item => {
+            item._lname = item.name.toLowerCase();
+            item._lnorm = item._lname.replace(/[\s\-_.]+/g, '');
+        });
         state.items = items;
         renderCurrentItems();
         saveLastFolder(state.stack);
@@ -850,14 +874,18 @@ function renderCurrentItems(fromSearch = false) {
 }
 
 function renderItems(allItems, query, fromSearch = false) {
-    const queryWords = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    const hlRegex    = buildHighlightRegex(query);
+    // Build query pairs once: [[word, wordNormalized], ...]
+    // reused across every item instead of recomputing per item
+    const rawWords  = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const pairs     = rawWords.map(w => [w, w.replace(/[\s\-_.]+/g, '')]);
+    const hlRegex   = buildHighlightRegex(query);
 
     const filtered = allItems
         .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => matchesWords(item.name, queryWords));
+        .filter(({ item }) => matchesItem(item, pairs));
 
-    setActionBar(allItems);
+    // Skip action bar update during search — it doesn't change while filtering
+    if (!fromSearch) setActionBar(allItems);
 
     if (!filtered.length) {
         const msg = query.trim()
@@ -868,7 +896,9 @@ function renderItems(allItems, query, fromSearch = false) {
     }
 
     const rows = filtered.map(({ item, idx }, i) => {
-        const delay   = Math.min(i * 22, 220);
+        // No stagger during search or on large lists (300+ items computing
+        // individual animation-delay styles blocks the render thread)
+        const delay   = (!fromSearch && filtered.length <= 60) ? Math.min(i * 22, 220) : 0;
         const isEx    = (state.expandAll || state.expandedItems.has(idx)) ? ' ex' : '';
         const nameClick = `onclick="toggleItemExpand(event,${idx})"`;
 
@@ -888,7 +918,7 @@ function renderItems(allItems, query, fromSearch = false) {
             const percent    = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
             const inProgress = !completed && percent > 0;
             let iconClass = 'fi-video', iconGlyph = '▶', tagHtml = '';
-            if (completed)   { iconClass += ' fi-watched';  iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
+            if (completed)       { iconClass += ' fi-watched';  iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
             else if (inProgress) { iconClass += ' fi-progress'; tagHtml = ` · <span class="progress-tag">${percent}% watched</span>`; }
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
             return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
@@ -923,7 +953,8 @@ function clickItem(idx) {
         markWatched(item.url);
         saveToHistory(item.url, item.name);
         saveLastPlaylist(playSeq.map(v => v.url));
-        renderCurrentItems();
+        // Lightweight UI update (no animation) — user is about to switch to MX Player
+        renderCurrentItems(true);
         if (window.Android) {
             window.Android.openVideoWithPlaylist(
                 JSON.stringify(allVideos.map(v => v.url)),
@@ -959,7 +990,7 @@ function playAll() {
     markWatched(videos[0].url);
     saveToHistory(videos[0].url, videos[0].name);
     saveLastPlaylist(videos.map(v => v.url));
-    renderCurrentItems();
+    renderCurrentItems(true);
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
             JSON.stringify(videos.map(v => v.url)),
@@ -977,7 +1008,7 @@ function resumePlay() {
     markWatched(videos[resumeIdx].url);
     saveToHistory(videos[resumeIdx].url, videos[resumeIdx].name);
     saveLastPlaylist(videos.slice(resumeIdx).map(v => v.url));
-    renderCurrentItems();
+    renderCurrentItems(true);
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
             JSON.stringify(videos.map(v => v.url)),
@@ -996,13 +1027,12 @@ function resumePlay() {
  */
 function setContent(html, animate = true) {
     const el = document.getElementById('content');
+    el.classList.remove('c-anim');
     el.innerHTML = html;
     el.scrollTop = 0;
-    if (animate) {
-        el.classList.remove('c-anim');
-        void el.offsetHeight;
-        el.classList.add('c-anim');
-    }
+    // rAF avoids forcing a synchronous layout after writing innerHTML —
+    // browser does the layout in its own paint cycle, animation still plays
+    if (animate) requestAnimationFrame(() => el.classList.add('c-anim'));
 }
 
 function setHeader(title, showSearch) {
@@ -1025,7 +1055,7 @@ function setBreadcrumb(stack) {
         else        html += `<span class="crumb" onclick="jumpToBreadcrumb(${i})">${esc(label)}</span>`;
     });
     el.innerHTML  = html;
-    el.scrollLeft = el.scrollWidth;
+    requestAnimationFrame(() => { el.scrollLeft = el.scrollWidth; });
 }
 
 function setActionBar(items) {
@@ -1165,7 +1195,8 @@ function showTab(tab) {
     document.getElementById('tabHistory').classList.toggle('tab-active', !isBrowse);
     if (!isBrowse) {
         const hv = document.getElementById('historyView');
-        hv.classList.remove('h-anim'); void hv.offsetHeight; hv.classList.add('h-anim');
+        hv.classList.remove('h-anim');
+        requestAnimationFrame(() => requestAnimationFrame(() => hv.classList.add('h-anim')));
     }
     if (isBrowse) {
         document.getElementById('hdrBadge').style.display = '';
