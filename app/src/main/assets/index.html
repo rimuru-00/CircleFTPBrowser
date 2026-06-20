@@ -1008,6 +1008,14 @@ function sortFiltered(pairs, mode) {
     if (mode === 'size-asc')  files.sort((a, b) => parseSizeBytes(a.item.size) - parseSizeBytes(b.item.size));
     return [...dirs, ...files];
 }
+/** Full state.items, reordered to match the currently active sort —
+ *  i.e. exactly what's drawn on screen. Used to build playlists so
+ *  Play All / Resume / tap-to-play send MX Player the same order the
+ *  user sees, not the original server order. */
+function getOrderedItems() {
+    const pairs = state.items.map((item, idx) => ({ item, idx }));
+    return sortFiltered(pairs, state.sortMode).map(p => p.item);
+}
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function showRoot() {
@@ -1180,7 +1188,7 @@ function clickItem(idx) {
     if (!item) return;
     if (item.isDir) { browse(item.url, item.name); return; }
     if (item.isVideo) {
-        const allVideos = state.items.filter(i => i.isVideo);
+        const allVideos = getOrderedItems().filter(i => i.isVideo);
         const startAt   = allVideos.findIndex(v => v.url === item.url);
         const playSeq   = allVideos.slice(Math.max(0, startAt));
         markWatched(item.url);
@@ -1218,7 +1226,7 @@ function jumpToBreadcrumb(idx) {
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
 function playAll() {
-    const videos = state.items.filter(i => i.isVideo);
+    const videos = getOrderedItems().filter(i => i.isVideo);
     if (!videos.length) return;
     markWatched(videos[0].url);
     saveToHistory(videos[0].url, videos[0].name);
@@ -1233,7 +1241,7 @@ function playAll() {
     }
 }
 function resumePlay() {
-    const videos = state.items.filter(i => i.isVideo);
+    const videos = getOrderedItems().filter(i => i.isVideo);
     if (!videos.length) return;
     let resumeIdx = videos.findIndex(v => { const r = watchRecord(v.url); return r && !r.completed && r.percent > 0; });
     if (resumeIdx === -1) resumeIdx = videos.findIndex(v => !watchRecord(v.url));
