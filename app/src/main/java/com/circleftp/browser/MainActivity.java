@@ -222,6 +222,25 @@ public class MainActivity extends AppCompatActivity {
         }
 
         /**
+         * Opens an external URL with the system's default handler — e.g. a
+         * t.me link opens straight into the Telegram app if installed,
+         * otherwise falls back to the browser. Needed because
+         * shouldOverrideUrlLoading() returns false above, which means a
+         * plain <a href> click would otherwise navigate the WebView itself
+         * away from index.html instead of leaving the app.
+         */
+        @JavascriptInterface
+        public void openExternalLink(String url) {
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+                } catch (Exception e) {
+                    showToast("Couldn't open link");
+                }
+            });
+        }
+
+        /**
          * Brief Android Toast for error feedback.
          */
         @JavascriptInterface
