@@ -551,10 +551,16 @@ body { display: flex; flex-direction: column; }
 const CONFIG = {
     roots: [
         {
-            name : "Anime Series",
+            name : "Anime Series 1",
             icon : "🎌",
             url  : "http://ftp15.circleftp.net/FILE/English%20%26%20Foreign%20Anime%20Series/",
             desc : "ftp15.circleftp.net"
+        },
+        {
+            name : "Anime Series 2",
+            icon : "🎌",
+            url  : "http://ftp17.circleftp.net/FILE/English%20%26%20Foreign%20Anime%20Series/",
+            desc : "ftp17.circleftp.net"
         }
     ],
     videoExts: ['.mkv','.mp4','.avi','.m4v','.webm','.ts',
@@ -1182,15 +1188,17 @@ async function fetchRootCounts() {
             if (Date.now() - ts < ROOT_COUNT_TTL) { updateRootCounts(counts); return; }
         }
     } catch (_) {}
-    try {
-        const counts = {};
-        for (const r of CONFIG.roots) {
+    const counts = {};
+    await Promise.all(CONFIG.roots.map(async (r) => {
+        try {
             const items = await fetchDirectory(r.url);
             counts[r.url] = items.filter(i => i.isDir).length;
-        }
+        } catch (_) { /* this source failed — leave its badge hidden, don't block others */ }
+    }));
+    if (Object.keys(counts).length) {
         try { localStorage.setItem(ROOT_COUNT_KEY, JSON.stringify({ counts, ts: Date.now() })); } catch (_) {}
         updateRootCounts(counts);
-    } catch (_) {}
+    }
 }
 
 function updateRootCounts(counts) {
