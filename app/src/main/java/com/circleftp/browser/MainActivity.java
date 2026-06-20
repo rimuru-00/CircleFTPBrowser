@@ -18,8 +18,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONArray;
 
-import java.util.ArrayList;
-
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
@@ -89,8 +87,13 @@ public class MainActivity extends AppCompatActivity {
          * Open a video and pass the FULL episode list to MX Player so
          * prev / next navigation works like a local folder.
          *
-         * MX Player reads the "video_list" parcelable ArrayList<Uri> extra
-         * and "video_list.name" ArrayList<String> extra natively.
+         * Per MX Player's official intent spec (sites.google.com/site/mxvpen/api),
+         * "video_list" MUST be a Parcelable[] (Uri[]) and "video_list.name" MUST be
+         * a String[] — NOT ArrayLists. putParcelableArrayListExtra/putStringArrayListExtra
+         * store ArrayLists under the hood; MX Player calls getParcelableArrayExtra()
+         * on its side, which silently fails to cast an ArrayList to an array (catches
+         * the ClassCastException internally and returns null) instead of crashing.
+         * That's why it was falling back to single-video playback with no prev/next.
          *
          * @param urlsJson   JSON array of all video URLs in the folder, e.g. ["http://...ep1","http://...ep2",...]
          * @param titlesJson JSON array of matching display names
@@ -103,24 +106,27 @@ public class MainActivity extends AppCompatActivity {
                     JSONArray urlsArr   = new JSONArray(urlsJson);
                     JSONArray titlesArr = new JSONArray(titlesJson);
 
-                    ArrayList<Uri>   uriList  = new ArrayList<>();
-                    ArrayList<String> nameList = new ArrayList<>();
+                    int count = urlsArr.length();
+                    Uri[]    uriArr  = new Uri[count];
+                    String[] nameArr = new String[count];
 
-                    for (int i = 0; i < urlsArr.length(); i++) {
-                        uriList.add(Uri.parse(urlsArr.getString(i)));
-                        nameList.add(titlesArr.getString(i));
+                    for (int i = 0; i < count; i++) {
+                        uriArr[i]  = Uri.parse(urlsArr.getString(i));
+                        nameArr[i] = titlesArr.getString(i);
                     }
 
                     // Clamp startIndex just in case
-                    int idx = Math.max(0, Math.min(startIndex, uriList.size() - 1));
+                    int idx = Math.max(0, Math.min(startIndex, count - 1));
 
                     Intent intent = new Intent(Intent.ACTION_VIEW);
                     intent.setPackage("com.mxtech.videoplayer.ad");
-                    // setData points to the starting episode
-                    intent.setDataAndType(uriList.get(idx), "video/*");
-                    // video_list = full playlist → MX Player enables prev/next
-                    intent.putParcelableArrayListExtra("video_list", uriList);
-                    intent.putStringArrayListExtra("video_list.name", nameList);
+                    // setData points to the starting episode — must also be present in video_list
+                    intent.setDataAndType(uriArr[idx], "video/*");
+                    // video_list = full playlist as a real array → MX Player enables prev/next
+                    intent.putExtra("video_list", uriArr);
+                    intent.putExtra("video_list.name", nameArr);
+                    // Force full-list playback regardless of MX Player's "Back to list" setting
+                    intent.putExtra("video_list_is_explicit", true);
                     startActivity(intent);
 
                 } catch (Exception e) {
