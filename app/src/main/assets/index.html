@@ -334,6 +334,16 @@ body { display: flex; flex-direction: column; }
 .progress-tag { color: var(--progress); }
 .farrow       { font-size: 18px; color: var(--border); flex-shrink: 0; }
 .farrow-play  { color: var(--video); font-size: 14px; }
+.expand-btn {
+    background: none; border: none;
+    color: var(--dim); font-size: 13px;
+    padding: 8px 2px 8px 6px;
+    cursor: pointer; flex-shrink: 0;
+    line-height: 1; border-radius: 4px;
+    transition: color 0.15s;
+}
+.expand-btn:active { color: var(--text); background: var(--surface2); }
+.fitem.ex .expand-btn { color: var(--accent-lt); }
 .match        { color: var(--accent-lt); font-weight: 700; }
 
 /* ─── States ─────────────────────────────────────────────────────────────── */
@@ -782,8 +792,12 @@ function toggleItemExpand(event, idx) {
     event.stopPropagation();
     if (state.expandedItems.has(idx)) state.expandedItems.delete(idx);
     else state.expandedItems.add(idx);
+    const expanded = state.expandedItems.has(idx) || state.expandAll;
     const el = document.querySelector(`.fitem[data-idx="${idx}"]`);
-    if (el) el.classList.toggle('ex', state.expandedItems.has(idx) || state.expandAll);
+    if (!el) return;
+    el.classList.toggle('ex', expanded);
+    const btn = el.querySelector('.expand-btn');
+    if (btn) btn.textContent = expanded ? '⌃' : '⌄';
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
@@ -900,15 +914,16 @@ function renderItems(allItems, query, fromSearch = false) {
         // individual animation-delay styles blocks the render thread)
         const delay   = (!fromSearch && filtered.length <= 60) ? Math.min(i * 22, 220) : 0;
         const isEx    = (state.expandAll || state.expandedItems.has(idx)) ? ' ex' : '';
-        const nameClick = `onclick="toggleItemExpand(event,${idx})"`;
+        const expBtn  = `<button class="expand-btn" onclick="event.stopPropagation();toggleItemExpand(event,${idx})" title="Expand name">${isEx ? '⌃' : '⌄'}</button>`;
 
         if (item.isDir) {
             return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
-                    <div class="fname" ${nameClick}>${highlightName(item.name, hlRegex)}</div>
+                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
                     <div class="fmeta">Folder</div>
                 </div>
+                ${expBtn}
                 <div class="farrow">›</div>
             </div>`;
         }
@@ -924,18 +939,20 @@ function renderItems(allItems, query, fromSearch = false) {
             return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon ${iconClass}">${iconGlyph}</div>
                 <div class="finfo">
-                    <div class="fname" ${nameClick}>${highlightName(item.name, hlRegex)}</div>
+                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
                     <div class="fmeta">${meta}${tagHtml}</div>
                 </div>
+                ${expBtn}
                 <div class="farrow farrow-play">▶</div>
             </div>`;
         }
         return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms;opacity:.4;cursor:default">
             <div class="ficon" style="background:rgba(115,115,115,.08);color:var(--dim)">📄</div>
             <div class="finfo">
-                <div class="fname" ${nameClick}>${esc(item.name)}</div>
+                <div class="fname">${esc(item.name)}</div>
                 <div class="fmeta">${esc(item.size||'File')}</div>
             </div>
+            ${expBtn}
         </div>`;
     }).join('');
 
