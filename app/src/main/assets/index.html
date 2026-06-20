@@ -912,6 +912,7 @@ async function browse(url, title) {
         state.items  = items;
         renderCurrentItems();
         saveLastFolder(state.stack);
+        saveToHistory(url, title, 'folder');
     } catch (err) {
         state.stack.pop();
         setBreadcrumb(state.stack);
@@ -1243,10 +1244,10 @@ function loadHistory() {
  * Deduplicates by URL so rewatching an episode just bumps it to the top.
  * Capped at 100 entries.
  */
-function saveToHistory(url, name) {
+function saveToHistory(url, name, type = 'video') {
     try {
         let h = loadHistory().filter(e => e.url !== url);
-        h.unshift({ url, name, at: Date.now() });
+        h.unshift({ url, name, type, at: Date.now() });
         if (h.length > 100) h.length = 100;
         localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(h));
     } catch (_) {}
@@ -1298,7 +1299,20 @@ function renderHistory() {
     }
 
     const rows = history.map((entry, i) => {
-        const delay = Math.min(i * 22, 220);
+        const delay    = Math.min(i * 22, 220);
+        const isFolder = (entry.type || 'video') === 'folder';
+
+        if (isFolder) {
+            return `<div class="fitem" style="animation-delay:${delay}ms" onclick="browseHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
+                <div class="ficon fi-dir">📁</div>
+                <div class="finfo">
+                    <div class="fname">${esc(entry.name)}</div>
+                    <div class="fmeta">${timeAgo(entry.at)} · Folder</div>
+                </div>
+                <div class="farrow">›</div>
+            </div>`;
+        }
+
         const rec        = watchRecord(entry.url);
         const completed  = !!(rec && rec.completed);
         const percent    = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
@@ -1351,6 +1365,14 @@ function playHistoryItem(url, name) {
     } else {
         window.open(url, '_blank');
     }
+}
+
+/**
+ * Tap a folder history entry → switch back to browse tab and open the folder.
+ */
+function browseHistoryItem(url, name) {
+    showTab('browse');
+    browse(url, name);
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────────
