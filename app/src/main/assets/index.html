@@ -6,6 +6,7 @@
       maximum-scale=1.0, user-scalable=no">
 <title>CircleFTP</title>
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 /* ─── Reset & tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
     margin: 0; padding: 0;
@@ -13,25 +14,28 @@
     -webkit-tap-highlight-color: transparent;
 }
 :root {
-    --bg:       #0d0d0d;
-    --surface:  #161616;
-    --surface2: #1f1f1f;
-    --border:   #282828;
-    --accent:   #ff5722;
-    --folder:   #ffa726;
-    --video:    #42a5f5;
-    --watched:  #4caf50;
-    --text:     #e0e0e0;
-    --dim:      #737373;
-    --radius:   10px;
+    --bg:        #07070e;
+    --surface:   #0c0d1a;
+    --surface2:  #131428;
+    --border:    #1c1e38;
+    --accent:    #8b5cf6;
+    --accent-dk: #6d28d9;
+    --accent-lt: #a78bfa;
+    --folder:    #f59e0b;
+    --video:     #38bdf8;
+    --watched:   #34d399;
+    --progress:  #fb923c;
+    --text:      #d4d4ec;
+    --dim:       #52538a;
+    --radius:    12px;
 }
 html, body {
     height: 100%;
     overflow: hidden;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-                 'Helvetica Neue', sans-serif;
+    font-family: 'Outfit', 'Nunito', 'Poppins', -apple-system,
+                 BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 body { display: flex; flex-direction: column; }
@@ -39,9 +43,10 @@ body { display: flex; flex-direction: column; }
 /* ─── Header ─────────────────────────────────────────────────────────────── */
 #header {
     flex-shrink: 0;
-    height: 56px;
+    height: 58px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 20px rgba(139,92,246,.08);
     display: flex;
     align-items: center;
     padding: 0 8px 0 4px;
@@ -56,52 +61,74 @@ body { display: flex; flex-direction: column; }
     border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
+    transition: background 0.15s ease;
 }
 .hdr-icon-btn:active { background: var(--surface2); }
 #hdrTitle {
     flex: 1;
-    font-size: 17px; font-weight: 500;
+    font-size: 17px; font-weight: 600;
+    letter-spacing: -0.01em;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .hdr-badge {
     flex-shrink: 0;
-    background: var(--accent); color: #fff;
-    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
-    padding: 3px 8px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent-dk), var(--accent));
+    color: #fff;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    padding: 4px 9px; border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(139,92,246,.4);
 }
 
-/* ─── Search input (replaces title in header) ────────────────────────────── */
+/* ─── Search ─────────────────────────────────────────────────────────────── */
 #searchWrap {
     flex: 1;
-    display: none; /* shown when search is active */
+    display: none;
     align-items: center;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 22px;
-    padding: 0 12px;
+    padding: 0 10px 0 12px;
     height: 38px;
     gap: 8px;
     transform-origin: right center;
 }
 #searchWrap.active {
     display: flex;
-    animation: searchSpring 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation: searchSpring 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
+/* hide native webkit/android clear button */
+#searchInput::-webkit-search-cancel-button,
+#searchInput::-webkit-input-placeholder { }
 #searchInput {
     flex: 1;
     background: none; border: none; outline: none;
     color: var(--text);
-    font-size: 15px;
+    font-size: 15px; font-family: inherit;
     caret-color: var(--accent);
 }
 #searchInput::placeholder { color: var(--dim); }
 #searchClear {
     background: none; border: none;
-    color: var(--dim); font-size: 18px;
-    cursor: pointer; padding: 0;
+    color: var(--dim); font-size: 14px;
+    cursor: pointer; padding: 2px 4px;
+    border-radius: 50%;
     display: none;
+    transition: color 0.15s;
 }
-#searchClear.visible { display: block; }
+#searchClear.visible { display: flex; align-items: center; justify-content: center; }
+#searchClear:active  { color: var(--text); }
+#searchClose {
+    display: none;
+    width: 36px; height: 36px;
+    border: none; background: none;
+    color: var(--dim); font-size: 20px;
+    cursor: pointer; flex-shrink: 0;
+    border-radius: 50%;
+    align-items: center; justify-content: center;
+    transition: color 0.15s ease;
+}
+#searchClose.visible { display: flex; }
+#searchClose:active { color: var(--text); }
 
 /* ─── Breadcrumb ─────────────────────────────────────────────────────────── */
 #bread {
@@ -119,13 +146,13 @@ body { display: flex; flex-direction: column; }
 }
 #bread::-webkit-scrollbar { display: none; }
 .crumb {
-    font-size: 12px; color: var(--dim);
+    font-size: 12px; font-weight: 500; color: var(--dim);
     padding: 4px 5px; border-radius: 4px;
     cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .crumb:not(.crumb-current):active { background: var(--surface2); }
-.crumb-current { color: var(--text); cursor: default; }
-.crumb-sep { font-size: 12px; color: var(--border); flex-shrink: 0; }
+.crumb-current { color: var(--accent-lt); cursor: default; }
+.crumb-sep { font-size: 11px; color: var(--border); flex-shrink: 0; }
 
 /* ─── Action bar ─────────────────────────────────────────────────────────── */
 #actionBar {
@@ -134,35 +161,55 @@ body { display: flex; flex-direction: column; }
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 10px 12px 8px;
-    gap: 8px;
+    padding: 10px 12px 10px;
+    gap: 10px;
 }
-.progress-row { display: flex; align-items: center; gap: 8px; }
+.progress-row { display: flex; align-items: center; gap: 10px; }
 .progress-text {
     flex-shrink: 0;
-    font-size: 11px; color: var(--dim); white-space: nowrap;
+    font-size: 11.5px; font-weight: 500; color: var(--dim); white-space: nowrap;
 }
 .progress-track {
-    flex: 1; height: 4px; border-radius: 2px;
+    flex: 1; height: 3px; border-radius: 2px;
     background: var(--border); overflow: hidden;
 }
 .progress-fill {
     height: 100%; width: 0%; border-radius: 2px;
-    background: var(--watched);
-    transition: width .2s ease;
+    background: linear-gradient(90deg, var(--accent-dk), var(--watched));
+    transition: width .3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.action-btn-row { display: flex; gap: 8px; }
+.action-btn-row { display: flex; gap: 8px; align-items: center; }
 .ab-btn {
-    flex: 1; height: 38px;
-    border: none; border-radius: 8px;
-    font-size: 13px; font-weight: 600;
+    flex: 1; height: 40px;
+    border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 600; font-family: inherit;
     cursor: pointer;
     display: inline-flex; align-items: center;
     justify-content: center; gap: 6px;
+    transition: opacity .15s ease, transform .1s ease;
 }
-.ab-btn:active { opacity: 0.75; }
-.ab-fill    { background: var(--accent); color: #fff; }
-.ab-outline { background: transparent; color: var(--dim); border: 1px solid var(--border); }
+.ab-btn:active { opacity: 0.78; transform: scale(0.97); }
+.ab-fill {
+    background: linear-gradient(135deg, var(--accent-dk), var(--accent));
+    color: #fff;
+    box-shadow: 0 3px 12px rgba(139,92,246,.35);
+}
+.ab-outline {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+.ab-icon {
+    flex: 0 0 40px; width: 40px; height: 40px;
+    background: var(--surface2);
+    color: var(--dim); border: 1px solid var(--border);
+    border-radius: 10px; font-size: 17px;
+    transition: color .15s, border-color .15s, opacity .15s, transform .1s;
+}
+.ab-icon.active {
+    color: var(--accent-lt);
+    border-color: var(--accent);
+}
 
 /* ─── Scroll content ─────────────────────────────────────────────────────── */
 #content {
@@ -174,28 +221,29 @@ body { display: flex; flex-direction: column; }
 #content::-webkit-scrollbar-thumb { background: var(--border); }
 
 /* ─── Root cards ─────────────────────────────────────────────────────────── */
-.root-list { padding: 16px 12px; display: flex; flex-direction: column; gap: 10px; }
-
-/* ─── Continue Browsing card ─────────────────────────────────────────────── */
+.root-list { padding: 18px 14px; display: flex; flex-direction: column; gap: 12px; }
 .continue-card {
     position: relative;
     display: flex; align-items: center; gap: 14px;
-    padding: 14px 40px 14px 14px;
-    background: var(--surface); border: 1px solid var(--accent);
-    border-radius: 14px; cursor: pointer;
-    animation: fadeUp 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+    padding: 15px 44px 15px 14px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 16px; cursor: pointer;
+    box-shadow: 0 0 18px rgba(139,92,246,.12);
+    animation: fadeUp 0.28s cubic-bezier(0.4,0,0.2,1) both;
 }
 .continue-card:active { background: var(--surface2); }
 .continue-icon {
-    width: 44px; height: 44px; border-radius: 12px;
-    background: rgba(255,87,34,.15); color: var(--accent);
+    width: 46px; height: 46px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(109,40,217,.3), rgba(139,92,246,.2));
+    color: var(--accent-lt);
     display: flex; align-items: center; justify-content: center;
-    font-size: 20px; flex-shrink: 0;
+    font-size: 22px; flex-shrink: 0;
 }
 .continue-info { flex: 1; min-width: 0; }
 .continue-label {
-    font-size: 10px; font-weight: 700; letter-spacing: .6px;
-    color: var(--accent); text-transform: uppercase; margin-bottom: 2px;
+    font-size: 10px; font-weight: 700; letter-spacing: .8px;
+    color: var(--accent-lt); text-transform: uppercase; margin-bottom: 2px;
 }
 .continue-title {
     font-size: 14.5px; font-weight: 600;
@@ -206,10 +254,10 @@ body { display: flex; flex-direction: column; }
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .continue-dismiss {
-    position: absolute; top: 8px; right: 8px;
+    position: absolute; top: 10px; right: 10px;
     width: 28px; height: 28px; border-radius: 50%;
     border: none; background: none; color: var(--dim);
-    font-size: 15px; cursor: pointer;
+    font-size: 14px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
 .continue-dismiss:active { background: var(--surface2); }
@@ -217,131 +265,106 @@ body { display: flex; flex-direction: column; }
     display: flex; align-items: center; gap: 14px;
     padding: 16px 14px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 14px; cursor: pointer;
-    animation: fadeUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
+    border-radius: 16px; cursor: pointer;
+    transition: border-color .2s;
+    animation: fadeUp 0.32s cubic-bezier(0.4,0,0.2,1) both;
 }
-.root-card:active { background: var(--surface2); }
+.root-card:active { background: var(--surface2); border-color: var(--accent); }
 .root-icon {
-    width: 50px; height: 50px; border-radius: 12px;
-    background: rgba(255,87,34,.12);
+    width: 52px; height: 52px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(109,40,217,.25), rgba(139,92,246,.15));
     display: flex; align-items: center; justify-content: center;
-    font-size: 24px; flex-shrink: 0;
+    font-size: 26px; flex-shrink: 0;
 }
 .root-info { flex: 1; min-width: 0; }
-.root-name { font-size: 15px; font-weight: 600; }
-.root-desc { font-size: 11px; color: var(--dim); margin-top: 3px;
+.root-name { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.root-desc { font-size: 11.5px; color: var(--dim); margin-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ─── File / folder list ─────────────────────────────────────────────────── */
 .fitem {
     display: flex; align-items: center; gap: 12px;
-    padding: 0 12px; height: 64px;
+    padding: 0 14px; height: 66px;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
+    transition: background .12s ease;
     animation: slideInX 0.2s ease both;
 }
 .fitem:active { background: var(--surface2); }
+
+/* Expanded name state */
+.fitem.ex {
+    height: auto;
+    min-height: 66px;
+    align-items: flex-start;
+    padding-top: 13px;
+    padding-bottom: 13px;
+}
+.fitem.ex .finfo { padding-top: 1px; }
+.fitem.ex .fname {
+    white-space: normal !important;
+    overflow: visible !important;
+    word-break: break-word;
+    cursor: text;
+}
+
 .ficon {
-    width: 42px; height: 42px; border-radius: var(--radius);
+    width: 44px; height: 44px; border-radius: var(--radius);
     display: flex; align-items: center; justify-content: center;
     font-size: 20px; flex-shrink: 0;
 }
-.fi-dir   { background: rgba(255,167,38,.12); color: var(--folder); }
-.fi-video { background: rgba( 66,165,245,.12); color: var(--video); }
-.fi-watched { background: rgba(76,175,80,.15); color: var(--watched); }
-.fi-progress { background: rgba(255,167,38,.15); color: var(--folder); }
-.finfo { flex: 1; min-width: 0; }
-.fname { font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.fmeta { font-size: 11px; color: var(--dim); margin-top: 3px; }
-.watched-tag  { color: var(--watched); }
-.progress-tag { color: var(--folder); }
-.farrow      { font-size: 18px; color: var(--border); flex-shrink: 0; }
-.farrow-play { color: var(--video); font-size: 14px; }
+.fi-dir      { background: rgba(245,158,11,.12); color: var(--folder); }
+.fi-video    { background: rgba( 56,189,248,.12); color: var(--video);  }
+.fi-watched  { background: rgba( 52,211,153,.15); color: var(--watched);}
+.fi-progress { background: rgba(251,146, 60,.15); color: var(--progress);}
 
-/* highlight matched search chars */
-.match { color: var(--accent); font-weight: 600; }
+.finfo { flex: 1; min-width: 0; }
+.fname {
+    font-size: 14px; font-weight: 500;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    cursor: pointer; /* signals it's tappable to expand */
+}
+.fmeta { font-size: 11.5px; color: var(--dim); margin-top: 3px; }
+.watched-tag  { color: var(--watched); }
+.progress-tag { color: var(--progress); }
+.farrow       { font-size: 18px; color: var(--border); flex-shrink: 0; }
+.farrow-play  { color: var(--video); font-size: 14px; }
+.match        { color: var(--accent-lt); font-weight: 700; }
 
 /* ─── States ─────────────────────────────────────────────────────────────── */
 .state-center {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    min-height: 220px; gap: 14px;
+    min-height: 260px; gap: 14px;
     color: var(--dim); font-size: 14px;
     text-align: center; padding: 24px;
 }
 .spinner {
-    width: 36px; height: 36px;
+    width: 38px; height: 38px;
     border: 3px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin .75s linear infinite, popIn 0.3s ease both;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-    .spinner { animation: spin .75s linear infinite; }
-}
 .retry-btn {
-    margin-top: 8px; padding: 8px 20px;
-    border: 1px solid var(--border); border-radius: 8px;
+    margin-top: 8px; padding: 9px 22px;
+    border: 1px solid var(--border); border-radius: 10px;
     background: none; color: var(--text);
-    font-size: 13px; cursor: pointer;
+    font-size: 13px; font-family: inherit; font-weight: 500;
+    cursor: pointer;
 }
 .retry-btn:active { background: var(--surface2); }
 .err-msg { font-size: 12px; color: var(--dim); word-break: break-word; }
+.no-results { font-size: 30px; margin-bottom: 4px; }
 
-/* search empty state */
-.no-results { font-size: 28px; margin-bottom: 4px; }
-
-/* ─── Keyframes ──────────────────────────────────────────────────────────── */
-@keyframes fadeUp {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideInX {
-    from { opacity: 0; transform: translateX(-12px); }
-    to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes popIn {
-    from { opacity: 0; transform: scale(0.65); }
-    to   { opacity: 1; transform: scale(1); }
-}
-@keyframes searchSpring {
-    from { opacity: 0; transform: scaleX(0.82) scaleY(0.88); }
-    to   { opacity: 1; transform: scaleX(1) scaleY(1); }
-}
-@keyframes cFade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-}
-@keyframes hdrBadgePop {
-    0%   { transform: scale(0.7); opacity: 0; }
-    70%  { transform: scale(1.1); }
-    100% { transform: scale(1);   opacity: 1; }
-}
-@keyframes tabDot {
-    0%   { transform: scaleX(0); }
-    100% { transform: scaleX(1); }
-}
-
-/* ─── Animation applications ─────────────────────────────────────────────── */
-
-/* Content area fades in on every navigate */
-#content.c-anim { animation: cFade 0.22s ease both; }
-
-/* History view fades in when tab switches */
-#historyView.h-anim { animation: cFade 0.22s ease both; }
-
-/* Tab Bar ─────────────────────────────────────────────────────────────────── */
-/* ─── Tab Bar ─────────────────────────────────────────────────────────────── */
+/* ─── Tab bar ─────────────────────────────────────────────────────────────── */
 #tabBar {
     flex-shrink: 0;
-    height: 54px;
-    background: var(--surface);
+    height: 56px;
+    background: rgba(12,13,26,.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-top: 1px solid var(--border);
     display: flex;
     z-index: 20;
@@ -353,15 +376,16 @@ body { display: flex; flex-direction: column; }
     gap: 3px;
     border: none; background: none;
     color: var(--dim);
-    font-size: 20px; cursor: pointer;
+    font-size: 22px; cursor: pointer;
     padding: 6px 0;
-    transition: color 0.18s ease, transform 0.12s ease;
+    font-family: inherit;
+    transition: color 0.2s ease, transform 0.12s ease;
 }
 .tab-btn span {
-    font-size: 10px; font-weight: 600; letter-spacing: .5px;
+    font-size: 10px; font-weight: 600; letter-spacing: .6px;
     text-transform: uppercase;
 }
-.tab-btn:active { background: var(--surface2); transform: scale(0.88); }
+.tab-btn:active { transform: scale(0.87); }
 .tab-active { color: var(--accent) !important; }
 
 /* ─── History View ───────────────────────────────────────────────────────── */
@@ -375,8 +399,28 @@ body { display: flex; flex-direction: column; }
 #historyView::-webkit-scrollbar-thumb { background: var(--border); }
 .hist-section-title {
     font-size: 11px; font-weight: 700;
-    letter-spacing: .8px; color: var(--dim);
+    letter-spacing: .9px; color: var(--dim);
     text-transform: uppercase;
+}
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp    { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@keyframes slideInX  { from { opacity:0; transform:translateX(-14px); } to { opacity:1; transform:none; } }
+@keyframes popIn     { from { opacity:0; transform:scale(0.6); } to { opacity:1; transform:none; } }
+@keyframes searchSpring { from { opacity:0; transform:scaleX(0.8) scaleY(0.85); } to { opacity:1; transform:none; } }
+@keyframes cFade     { from { opacity:0; } to { opacity:1; } }
+
+/* ─── Animation helpers ──────────────────────────────────────────────────── */
+#content.c-anim      { animation: cFade 0.22s ease both; }
+#historyView.h-anim  { animation: cFade 0.22s ease both; }
+
+/* ─── Accessibility ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    .spinner { animation: spin .75s linear infinite; }
 }
 </style>
 </head>
@@ -384,18 +428,18 @@ body { display: flex; flex-direction: column; }
 
 <!-- ── Header ─────────────────────────────────────────────────────────── -->
 <div id="header">
-    <button id="backBtn"   class="hdr-icon-btn" style="display:none" onclick="goBack()">‹</button>
+    <button id="backBtn"    class="hdr-icon-btn" style="display:none" onclick="goBack()">‹</button>
     <div    id="hdrTitle">CircleFTP Browser</div>
-    <!-- search input — hidden until searchBtn tapped -->
     <div id="searchWrap">
-        <span style="color:var(--dim);font-size:16px">⌕</span>
-        <input id="searchInput" type="search" placeholder="Search…"
+        <span style="color:var(--dim);font-size:15px">⌕</span>
+        <input id="searchInput" type="text" placeholder="Search…"
                autocomplete="off" autocorrect="off" spellcheck="false"
                oninput="onSearchInput(this.value)">
         <button id="searchClear" onclick="clearSearch()">✕</button>
     </div>
-    <button id="searchBtn" class="hdr-icon-btn" style="display:none" onclick="toggleSearch()">⌕</button>
-    <div    id="hdrBadge"  class="hdr-badge">FTP</div>
+    <button id="searchClose" onclick="closeSearch()">✕</button>
+    <button id="searchBtn"  class="hdr-icon-btn" style="display:none" onclick="toggleSearch()">⌕</button>
+    <div    id="hdrBadge"   class="hdr-badge">FTP</div>
 </div>
 
 <!-- ── Breadcrumb ─────────────────────────────────────────────────────── -->
@@ -410,6 +454,7 @@ body { display: flex; flex-direction: column; }
     <div class="action-btn-row">
         <button class="ab-btn ab-fill"    onclick="playAll()">▶&nbsp; Play All</button>
         <button class="ab-btn ab-outline" id="resumeBtn" onclick="resumePlay()">⏩&nbsp; Resume</button>
+        <button class="ab-btn ab-icon"    id="expandBtn" onclick="toggleExpandAll()" title="Expand names">⊞</button>
     </div>
 </div>
 
@@ -425,7 +470,6 @@ body { display: flex; flex-direction: column; }
     <button id="tabHistory" class="tab-btn"            onclick="showTab('history')">🕒<span>History</span></button>
 </div>
 
-
 <script>
 "use strict";
 
@@ -438,13 +482,12 @@ const CONFIG = {
             url  : "http://ftp15.circleftp.net/FILE/English%20%26%20Foreign%20Anime%20Series/",
             desc : "ftp15.circleftp.net"
         }
-        // Add more roots here
     ],
     videoExts: ['.mkv','.mp4','.avi','.m4v','.webm','.ts',
                 '.flv','.wmv','.m2ts','.mov','.rmvb']
 };
 
-// ── PERSISTENCE (localStorage) ────────────────────────────────────────────────
+// ── PERSISTENCE ───────────────────────────────────────────────────────────────
 const STORAGE_KEYS = {
     WATCHED:      'cftp_watched_v1',
     LAST_FOLDER:  'cftp_lastFolder_v1',
@@ -454,82 +497,49 @@ const STORAGE_KEYS = {
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 const state = {
-    stack       : [],   // navigation history: [{url, title}]
-    items       : [],   // full unfiltered items in current folder
-    searchQuery : '',   // current search string
-    searchActive: false,
-    activeTab   : 'browse',  // 'browse' | 'history'
-    watched     : loadWatchedMap()   // { videoUrl: record } — see watchRecord() below
+    stack        : [],
+    items        : [],
+    searchQuery  : '',
+    searchActive : false,
+    activeTab    : 'browse',
+    expandAll    : false,
+    expandedItems: new Set(),
+    watched      : loadWatchedMap()
 };
 
-/**
- * Watched-episode tracking. Stored as { videoUrl: record } in localStorage so
- * checkmarks/progress survive app restarts.
- *
- * record is normally an object: { completed, percent, position, duration, updatedAt }.
- * Older builds stored a plain timestamp number instead — watchRecord() below
- * reads those transparently as completed:true so nobody's existing checkmarks
- * disappear on upgrade.
- *
- * "completed" is set two ways:
- *   1. Optimistically the moment an episode is tapped/started (markWatched) —
- *      the same simple behavior as before, just per-episode instead of
- *      blanket-applied to an entire Play All / Shuffle batch.
- *   2. Authoritatively from MX Player's actual playback result, if the
- *      installed build still returns one (see onPlaybackResult below) — this
- *      is what fills in real position/duration and corrects episodes that
- *      were never actually played.
- */
+// ── WATCH TRACKING ────────────────────────────────────────────────────────────
 function loadWatchedMap() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEYS.WATCHED);
-        return raw ? JSON.parse(raw) : {};
-    } catch (_) { return {}; }
+    try { const r = localStorage.getItem(STORAGE_KEYS.WATCHED); return r ? JSON.parse(r) : {}; }
+    catch (_) { return {}; }
 }
-
 function persistWatchedMap() {
     try { localStorage.setItem(STORAGE_KEYS.WATCHED, JSON.stringify(state.watched)); }
-    catch (_) { /* storage full/unavailable — fail silently, app still works */ }
+    catch (_) {}
 }
-
-/** Normalizes a stored entry (object OR legacy timestamp number) into a record shape. */
 function watchRecord(url) {
     const rec = state.watched[url];
     if (!rec) return null;
     if (typeof rec === 'object') return rec;
-    return { completed: true, percent: 100, updatedAt: rec }; // legacy format
+    return { completed: true, percent: 100, updatedAt: rec };
 }
-
-/** Optimistic "tapped / started this" marker — may get refined later by a
- *  real position/duration from recordPlaybackProgress(). */
 function markWatched(url) {
     const existing = (typeof state.watched[url] === 'object') ? state.watched[url] : {};
-    state.watched[url] = Object.assign({}, existing, {
-        completed: true,
-        percent: 100,
-        updatedAt: Date.now()
-    });
+    state.watched[url] = Object.assign({}, existing, { completed: true, percent: 100, updatedAt: Date.now() });
     persistWatchedMap();
 }
-
-/** Records a real per-episode result reported back by MX Player. */
 function recordPlaybackProgress(url, position, duration) {
     if (!url) return;
     const hasNums = typeof position === 'number' && position >= 0 &&
                     typeof duration === 'number' && duration > 0;
     const percent = hasNums ? Math.max(0, Math.min(100, Math.round((position / duration) * 100))) : 100;
     state.watched[url] = {
-        completed: !hasNums || percent >= 95,   // missing position/duration = finished normally
-        percent: percent,
-        position: hasNums ? position : undefined,
+        completed: !hasNums || percent >= 95,
+        percent, position: hasNums ? position : undefined,
         duration: hasNums ? duration : undefined,
         updatedAt: Date.now()
     };
     persistWatchedMap();
 }
-
-/** Marks every URL in the list as fully completed — used when MX Player
- *  reports the whole launched queue played through to its natural end. */
 function markUrlsCompleted(urls) {
     let changed = false;
     urls.forEach(u => {
@@ -540,154 +550,94 @@ function markUrlsCompleted(urls) {
     if (changed) persistWatchedMap();
 }
 
-/**
- * Remembers the exact sequence of URLs just handed to MX Player (in actual
- * playback order, starting from wherever playback begins) so that, if a
- * result comes back later, we know which episodes in THIS session preceded
- * whichever one was on screen when the user exited. Persisted (not just kept
- * in memory) because onActivityResult can in principle arrive after Android
- * has recreated the Activity — that reloads index.html and resets JS state,
- * but localStorage survives.
- */
+// ── PLAYLIST ──────────────────────────────────────────────────────────────────
 function saveLastPlaylist(urls) {
-    try {
-        localStorage.setItem(STORAGE_KEYS.LAST_PLAYLIST, JSON.stringify({ urls, startedAt: Date.now() }));
-    } catch (_) { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEYS.LAST_PLAYLIST, JSON.stringify({ urls, startedAt: Date.now() })); }
+    catch (_) {}
 }
-
 function loadLastPlaylist() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEYS.LAST_PLAYLIST);
-        return raw ? JSON.parse(raw) : null;
-    } catch (_) { return null; }
+    try { const r = localStorage.getItem(STORAGE_KEYS.LAST_PLAYLIST); return r ? JSON.parse(r) : null; }
+    catch (_) { return null; }
 }
-
 function clearLastPlaylist() {
-    try { localStorage.removeItem(STORAGE_KEYS.LAST_PLAYLIST); }
-    catch (_) { /* ignore */ }
+    try { localStorage.removeItem(STORAGE_KEYS.LAST_PLAYLIST); } catch (_) {}
 }
 
-/**
- * Called from native code (MainActivity#onActivityResult) after the user
- * returns from MX Player — IF the installed build still honors
- * "return_result" the way stock MX Player does. On a heavily modified APK
- * this may simply never fire; everything still works without it, just
- * without the extra accuracy below.
- *
- * result: { ok, uri, position, duration, end_by }
- */
+// ── MX PLAYER RESULT ─────────────────────────────────────────────────────────
 window.onPlaybackResult = function (result) {
     try {
         if (!result) return;
         const playlist = loadLastPlaylist();
         clearLastPlaylist();
         if (!playlist || !playlist.urls || !playlist.urls.length) return;
-
         if (result.end_by === 'playback_completion') {
-            // Reached the natural end of everything we handed to MX Player.
             markUrlsCompleted(playlist.urls);
         } else if (result.uri) {
             const idx = playlist.urls.indexOf(result.uri);
-            if (idx > 0) {
-                // Everything earlier in THIS session's sequence played through
-                // before the user reached/left the one MX Player reported.
-                markUrlsCompleted(playlist.urls.slice(0, idx));
-            }
-            if (idx !== -1) {
-                recordPlaybackProgress(result.uri, result.position, result.duration);
-            }
+            if (idx > 0) markUrlsCompleted(playlist.urls.slice(0, idx));
+            if (idx !== -1) recordPlaybackProgress(result.uri, result.position, result.duration);
         }
         renderCurrentItems();
-    } catch (_) { /* never let a native callback break the UI */ }
+    } catch (_) {}
 };
 
-/**
- * "Continue Browsing" — remembers the deepest folder the user navigated into,
- * as the full breadcrumb chain (so jumping back in restores proper breadcrumbs,
- * not just a flat URL). Updated every time browse() successfully loads a folder.
- */
+// ── FOLDER PERSISTENCE ────────────────────────────────────────────────────────
 function loadLastFolder() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEYS.LAST_FOLDER);
-        return raw ? JSON.parse(raw) : null;
-    } catch (_) { return null; }
+    try { const r = localStorage.getItem(STORAGE_KEYS.LAST_FOLDER); return r ? JSON.parse(r) : null; }
+    catch (_) { return null; }
 }
-
 function saveLastFolder(stack) {
-    try {
-        const trimmed = stack.map(s => ({ url: s.url, title: s.title }));
-        localStorage.setItem(STORAGE_KEYS.LAST_FOLDER, JSON.stringify(trimmed));
-    } catch (_) { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEYS.LAST_FOLDER, JSON.stringify(stack.map(s => ({ url:s.url, title:s.title })))); }
+    catch (_) {}
 }
-
 function clearLastFolder() {
-    try { localStorage.removeItem(STORAGE_KEYS.LAST_FOLDER); }
-    catch (_) { /* ignore */ }
+    try { localStorage.removeItem(STORAGE_KEYS.LAST_FOLDER); } catch (_) {}
 }
 
 // ── PARSING ───────────────────────────────────────────────────────────────────
-
 function isVideoFile(name) {
     const lower = name.toLowerCase();
     return CONFIG.videoExts.some(ext => lower.endsWith(ext));
 }
-
 async function fetchDirectory(url) {
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    return parseH5aiHtml(html, url);
+    return parseH5aiHtml(await res.text(), url);
 }
-
 function parseH5aiHtml(html, baseUrl) {
     const origin = new URL(baseUrl).origin;
     const doc    = new DOMParser().parseFromString(html, 'text/html');
     const items  = [];
     const seen   = new Set();
-
     const SKIP = new Set(['..','Parent Directory','Name','Last modified','Size',
                           'modern browsers','powered by h5ai','']);
-
     doc.querySelectorAll('a[href]').forEach(a => {
         const href    = (a.getAttribute('href') || '').trim();
         const rawName = a.textContent.trim();
-
-        if (!href || !rawName)             return;
-        if (SKIP.has(rawName))             return;
-        if (href === '..' || href==='../')  return;
-        if (href.startsWith('?'))           return;
-        if (href.startsWith('#'))           return;
-        if (href.includes('larsjung.de'))   return;
-        if (href.includes('browsehappy'))   return;
-        if (href.startsWith('mailto:'))     return;
-
+        if (!href || !rawName || SKIP.has(rawName)) return;
+        if (href === '..' || href === '../')  return;
+        if (href.startsWith('?') || href.startsWith('#')) return;
+        if (href.includes('larsjung.de') || href.includes('browsehappy')) return;
+        if (href.startsWith('mailto:')) return;
         let fullUrl;
-        if (href.startsWith('/')) {
-            fullUrl = origin + href;
-        } else if (href.startsWith('http://') || href.startsWith('https://')) {
+        if (href.startsWith('/')) fullUrl = origin + href;
+        else if (href.startsWith('http://') || href.startsWith('https://')) {
             if (!href.startsWith(origin)) return;
             fullUrl = href;
         } else {
-            try { fullUrl = new URL(href, baseUrl).href; }
-            catch (_) { return; }
+            try { fullUrl = new URL(href, baseUrl).href; } catch (_) { return; }
         }
-
         if (seen.has(fullUrl)) return;
         seen.add(fullUrl);
-
         let name = rawName;
         try { name = decodeURIComponent(rawName); } catch (_) {}
-
         const isDir   = fullUrl.endsWith('/');
         const isVideo = !isDir && isVideoFile(name);
         const size    = extractSize(a, isDir);
-
         items.push({ name, url: fullUrl, isDir, isVideo, size });
     });
-
     return items;
 }
-
 function extractSize(anchorEl, isDir) {
     if (isDir) return '';
     let el = anchorEl;
@@ -695,25 +645,15 @@ function extractSize(anchorEl, isDir) {
         el = el.parentElement;
         if (!el) break;
         const sizeEl = el.querySelector('.size,[class*="size"]');
-        if (sizeEl) {
-            const t = sizeEl.textContent.trim();
-            if (/\d/.test(t) && t.length < 25) return formatSize(t);
-        }
+        if (sizeEl) { const t = sizeEl.textContent.trim(); if (/\d/.test(t) && t.length < 25) return formatSize(t); }
         if (el.tagName === 'TR') {
             const tds = el.querySelectorAll('td');
-            if (tds.length >= 2) {
-                const last = tds[tds.length-1].textContent.trim();
-                if (/\d+\s*KB/i.test(last)||/\d+\s*MB/i.test(last)) return formatSize(last);
-            }
+            if (tds.length >= 2) { const last = tds[tds.length-1].textContent.trim(); if (/\d+\s*[KMG]B/i.test(last)) return formatSize(last); }
         }
-        if (el.hasAttribute('data-size')) {
-            const v = el.getAttribute('data-size');
-            if (/\d/.test(v)) return formatSize(v);
-        }
+        if (el.hasAttribute('data-size')) { const v = el.getAttribute('data-size'); if (/\d/.test(v)) return formatSize(v); }
     }
     return '';
 }
-
 function formatSize(raw) {
     if (!raw) return '';
     const m = raw.trim().match(/^([\d,]+)\s*(KB|MB|GB|B)?$/i);
@@ -732,27 +672,20 @@ function formatSize(raw) {
 // ── SEARCH ────────────────────────────────────────────────────────────────────
 
 /**
- * Fuzzy word search: every word must appear somewhere in the name
- * (case-insensitive). Handles:
- *   "attack titan"  → Attack on Titan ✓
- *   "one piece"     → One Piece ✓
- *   "naruto shipp"  → Naruto Shippuden ✓
- *
- * Accepts a pre-split, lowercased `words` array (built once per render
- * pass by renderItems) instead of re-splitting the query string for
- * every single item being filtered.
+ * Fuzzy word match — every typed word must appear somewhere in the name.
+ * Also tests against a normalized version (spaces/dashes stripped) so
+ * "rezero" matches "Re Zero", "attackontitan" matches "Attack on Titan", etc.
  */
 function matchesWords(name, words) {
     if (!words.length) return true;
     const lName = name.toLowerCase();
-    return words.every(w => lName.includes(w));
+    const lNorm = lName.replace(/[\s\-_.]+/g, ''); // strip separators
+    return words.every(w => {
+        const wNorm = w.replace(/[\s\-_.]+/g, '');
+        return lName.includes(w) || lNorm.includes(wNorm);
+    });
 }
 
-/**
- * Build a single compiled regex for the current query, reused across all
- * items in a render pass instead of recompiling per item (that recompilation
- * on every keystroke across a large list was part of the search lag).
- */
 function buildHighlightRegex(query) {
     const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
     if (!words.length) return null;
@@ -761,89 +694,85 @@ function buildHighlightRegex(query) {
         'gi'
     );
 }
-
-/**
- * Highlight matching words in a name string for display.
- * Returns safe HTML with <span class="match"> around matched segments.
- * `regex` should come from buildHighlightRegex(), built once per render pass.
- */
 function highlightName(name, regex) {
     if (!regex) return esc(name);
     return esc(name).replace(regex, '<span class="match">$1</span>');
 }
 
 function toggleSearch() {
-    if (state.searchActive) {
-        closeSearch();
-    } else {
-        openSearch();
-    }
+    state.searchActive ? closeSearch() : openSearch();
 }
-
 function openSearch() {
     state.searchActive = true;
     state.searchQuery  = '';
-    document.getElementById('hdrTitle').style.display    = 'none';
-    document.getElementById('hdrBadge').style.display    = 'none';
-    document.getElementById('searchBtn').style.display   = 'none';
+    document.getElementById('hdrTitle').style.display   = 'none';
+    document.getElementById('hdrBadge').style.display   = 'none';
+    document.getElementById('searchBtn').style.display  = 'none';
     document.getElementById('searchWrap').classList.add('active');
+    document.getElementById('searchClose').classList.add('visible');
     const inp = document.getElementById('searchInput');
     inp.value = '';
     inp.focus();
     renderCurrentItems();
 }
-
 function closeSearch() {
     state.searchActive = false;
     state.searchQuery  = '';
-    document.getElementById('searchInput').value          = '';
+    document.getElementById('searchInput').value = '';
     document.getElementById('searchWrap').classList.remove('active');
     document.getElementById('searchClear').classList.remove('visible');
-    // Restore header elements
-    document.getElementById('hdrTitle').style.display    = '';
-    document.getElementById('hdrBadge').style.display    = '';
+    document.getElementById('searchClose').classList.remove('visible');
+    document.getElementById('hdrTitle').style.display   = '';
+    document.getElementById('hdrBadge').style.display   = '';
     if (state.stack.length > 0)
         document.getElementById('searchBtn').style.display = '';
     renderCurrentItems();
 }
-
 function clearSearch() {
     document.getElementById('searchInput').value = '';
     state.searchQuery = '';
     document.getElementById('searchClear').classList.remove('visible');
-    renderCurrentItems();
+    renderCurrentItems(true);
     document.getElementById('searchInput').focus();
 }
 
 let searchDebounceTimer = null;
-
 function onSearchInput(val) {
     state.searchQuery = val;
     const clearBtn = document.getElementById('searchClear');
-    if (val.length > 0) clearBtn.classList.add('visible');
-    else                clearBtn.classList.remove('visible');
-
-    // Debounce: the full list re-render (filter + highlight regex + DOM rebuild)
-    // is too heavy to run on every single keystroke without making typing feel
-    // laggy. Wait for a short pause in typing before re-rendering.
+    clearBtn.classList.toggle('visible', val.length > 0);
     clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(renderCurrentItems, 120);
+    // 60ms feels instant; skip content animation during search (no reflow = no lag)
+    searchDebounceTimer = setTimeout(() => renderCurrentItems(true), 60);
+}
+
+// ── NAME EXPAND / COLLAPSE ────────────────────────────────────────────────────
+function toggleExpandAll() {
+    state.expandAll = !state.expandAll;
+    state.expandedItems.clear();
+    document.querySelectorAll('.fitem').forEach(el =>
+        el.classList.toggle('ex', state.expandAll)
+    );
+    document.getElementById('expandBtn').classList.toggle('active', state.expandAll);
+}
+function toggleItemExpand(event, idx) {
+    event.stopPropagation();
+    if (state.expandedItems.has(idx)) state.expandedItems.delete(idx);
+    else state.expandedItems.add(idx);
+    const el = document.querySelector(`.fitem[data-idx="${idx}"]`);
+    if (el) el.classList.toggle('ex', state.expandedItems.has(idx) || state.expandAll);
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
-
 function showRoot() {
-    // Close search if open
     if (state.searchActive) closeSearch();
-    state.stack = [];
-    state.items = [];
-
+    state.stack = []; state.items = [];
+    state.expandAll = false; state.expandedItems.clear();
     setHeader('CircleFTP Browser', false);
     setBreadcrumb([]);
     setActionBar([]);
-
     const cards = CONFIG.roots.map((r,i) => `
-        <div class="root-card" style="animation-delay:${80 + i * 50}ms" onclick="browseRoot(${i})">
+        <div class="root-card" style="animation-delay:${80+i*55}ms" onclick="browseRoot(${i})">
             <div class="root-icon">${r.icon}</div>
             <div class="root-info">
                 <div class="root-name">${esc(r.name)}</div>
@@ -851,19 +780,14 @@ function showRoot() {
             </div>
             <div class="farrow">›</div>
         </div>`).join('');
-
     setContent(`<div class="root-list">${buildContinueCard()}${cards}</div>`);
 }
-
-/** Builds the "Continue Browsing" card HTML, or '' if nothing saved. */
 function buildContinueCard() {
     const last = loadLastFolder();
     if (!last || !last.length) return '';
-
-    const deepest   = last[last.length - 1];
+    const deepest  = last[last.length - 1];
     const pathLabel = last.map(s => s.title).join(' › ');
     const safePath  = pathLabel.length > 60 ? '…' + pathLabel.slice(-58) : pathLabel;
-
     return `
     <div class="continue-card" onclick="continueBrowsing()">
         <div class="continue-icon">⏵</div>
@@ -873,11 +797,9 @@ function buildContinueCard() {
             <div class="continue-path">${esc(safePath)}</div>
         </div>
         <button class="continue-dismiss"
-            onclick="event.stopPropagation(); dismissContinue();">✕</button>
+            onclick="event.stopPropagation();dismissContinue()">✕</button>
     </div>`;
 }
-
-/** Jumps straight back into the last-browsed folder, breadcrumbs intact. */
 function continueBrowsing() {
     const last = loadLastFolder();
     if (!last || !last.length) return;
@@ -885,164 +807,118 @@ function continueBrowsing() {
     state.stack   = last.slice(0, -1);
     browse(deepest.url, deepest.title);
 }
-
-function dismissContinue() {
-    clearLastFolder();
-    showRoot();
-}
-
-function browseRoot(idx) {
-    const r = CONFIG.roots[idx];
-    browse(r.url, r.name);
-}
+function dismissContinue() { clearLastFolder(); showRoot(); }
+function browseRoot(idx)   { const r = CONFIG.roots[idx]; browse(r.url, r.name); }
 
 async function browse(url, title) {
-    // Reset search when navigating
     if (state.searchActive) closeSearch();
     state.searchQuery = '';
-
+    state.expandAll = false; state.expandedItems.clear();
     state.stack.push({ url, title });
     setHeader(title, true);
     setBreadcrumb(state.stack);
     setActionBar([]);
     setContent(`<div class="state-center"><div class="spinner"></div><span>Loading…</span></div>`);
-
     try {
-        const items  = await fetchDirectory(url);
-        state.items  = items;
+        const items = await fetchDirectory(url);
+        state.items = items;
         renderCurrentItems();
         saveLastFolder(state.stack);
         saveToHistory(url, title, 'folder');
     } catch (err) {
         state.stack.pop();
         setBreadcrumb(state.stack);
-        const safeUrl   = escAttr(url);
-        const safeTitle = escAttr(title);
-        setContent(`
-            <div class="state-center">
-                <div style="font-size:28px">⚠️</div>
-                <span>Could not load folder</span>
-                <span class="err-msg">${esc(err.message)}</span>
-                <button class="retry-btn"
-                    onclick="browse('${safeUrl}','${safeTitle}')">Retry</button>
-            </div>`);
+        const safeUrl = escAttr(url), safeTitle = escAttr(title);
+        setContent(`<div class="state-center">
+            <div style="font-size:28px">⚠️</div>
+            <span>Could not load folder</span>
+            <span class="err-msg">${esc(err.message)}</span>
+            <button class="retry-btn" onclick="browse('${safeUrl}','${safeTitle}')">Retry</button>
+        </div>`);
     }
 }
 
-/** Re-render the current items respecting any active search filter. */
-function renderCurrentItems() {
-    renderItems(state.items, state.searchQuery);
+/** Re-render current folder items.
+ *  @param {boolean} fromSearch - skip fade animation (prevents typing lag) */
+function renderCurrentItems(fromSearch = false) {
+    renderItems(state.items, state.searchQuery, fromSearch);
 }
 
-function renderItems(allItems, query) {
-    // Precompute once per render pass (not per item) — this is the
-    // expensive part that was being repeated for every single item
-    // on every keystroke.
+function renderItems(allItems, query, fromSearch = false) {
     const queryWords = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    const hlRegex     = buildHighlightRegex(query);
+    const hlRegex    = buildHighlightRegex(query);
 
-    // Pair each item with its original index in state.items
-    // so clickItem() can always reference the full unfiltered array.
     const filtered = allItems
         .map((item, idx) => ({ item, idx }))
         .filter(({ item }) => matchesWords(item.name, queryWords));
 
-    // Action bar: show when the FULL folder has videos (not filtered count)
     setActionBar(allItems);
 
     if (!filtered.length) {
         const msg = query.trim()
             ? `<div class="no-results">🔍</div><span>No results for "<b>${esc(query)}</b>"</span>`
             : '📂 This folder is empty';
-        setContent(`<div class="state-center">${msg}</div>`);
+        setContent(`<div class="state-center">${msg}</div>`, !fromSearch);
         return;
     }
 
     const rows = filtered.map(({ item, idx }, i) => {
-        const delay = `animation-delay:${Math.min(i * 22, 220)}ms`;
+        const delay   = Math.min(i * 22, 220);
+        const isEx    = (state.expandAll || state.expandedItems.has(idx)) ? ' ex' : '';
+        const nameClick = `onclick="toggleItemExpand(event,${idx})"`;
+
         if (item.isDir) {
-            return `
-            <div class="fitem" style="${delay}" onclick="clickItem(${idx})">
+            return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
-                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
+                    <div class="fname" ${nameClick}>${highlightName(item.name, hlRegex)}</div>
                     <div class="fmeta">Folder</div>
                 </div>
                 <div class="farrow">›</div>
             </div>`;
         }
         if (item.isVideo) {
-            const rec       = watchRecord(item.url);
-            const completed = !!(rec && rec.completed);
-            const percent   = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
+            const rec = watchRecord(item.url);
+            const completed  = !!(rec && rec.completed);
+            const percent    = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
             const inProgress = !completed && percent > 0;
-
-            let iconClass = 'fi-video';
-            let iconGlyph = '▶';
-            let tagHtml   = '';
-            if (completed) {
-                iconClass += ' fi-watched';
-                iconGlyph  = '✓';
-                tagHtml    = ' · <span class="watched-tag">Watched</span>';
-            } else if (inProgress) {
-                iconClass += ' fi-progress';
-                tagHtml    = ` · <span class="progress-tag">${percent}% watched</span>`;
-            }
-
+            let iconClass = 'fi-video', iconGlyph = '▶', tagHtml = '';
+            if (completed)   { iconClass += ' fi-watched';  iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
+            else if (inProgress) { iconClass += ' fi-progress'; tagHtml = ` · <span class="progress-tag">${percent}% watched</span>`; }
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
-            return `
-            <div class="fitem" style="${delay}" onclick="clickItem(${idx})">
+            return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon ${iconClass}">${iconGlyph}</div>
                 <div class="finfo">
-                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
+                    <div class="fname" ${nameClick}>${highlightName(item.name, hlRegex)}</div>
                     <div class="fmeta">${meta}${tagHtml}</div>
                 </div>
                 <div class="farrow farrow-play">▶</div>
             </div>`;
         }
-        // Non-video file (subs, nfo…)
-        return `
-            <div class="fitem" style="${delay};opacity:.4;cursor:default">
-                <div class="ficon" style="background:rgba(115,115,115,.1);color:var(--dim)">📄</div>
-                <div class="finfo">
-                    <div class="fname">${esc(item.name)}</div>
-                    <div class="fmeta">${esc(item.size||'File')}</div>
-                </div>
-            </div>`;
+        return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms;opacity:.4;cursor:default">
+            <div class="ficon" style="background:rgba(115,115,115,.08);color:var(--dim)">📄</div>
+            <div class="finfo">
+                <div class="fname" ${nameClick}>${esc(item.name)}</div>
+                <div class="fmeta">${esc(item.size||'File')}</div>
+            </div>
+        </div>`;
     }).join('');
 
-    setContent(`<div>${rows}</div>`);
+    setContent(`<div>${rows}</div>`, !fromSearch);
 }
 
-/**
- * Handle tap on a list item.
- * idx = original index in state.items (not filtered position).
- * For videos: always passes the FULL episode list to MX Player
- * so prev/next works across the whole season even if search was active.
- */
 function clickItem(idx) {
     const item = state.items[idx];
     if (!item) return;
-
-    if (item.isDir) {
-        browse(item.url, item.name);
-        return;
-    }
-
+    if (item.isDir) { browse(item.url, item.name); return; }
     if (item.isVideo) {
-        // Build full ordered video list from the unfiltered state.items
         const allVideos = state.items.filter(i => i.isVideo);
         const startAt   = allVideos.findIndex(v => v.url === item.url);
-        // What MX Player will actually play forward through this session —
-        // NOT the whole season, just from the tapped episode onward. Earlier
-        // episodes weren't touched and shouldn't get marked from this tap.
         const playSeq   = allVideos.slice(Math.max(0, startAt));
-
         markWatched(item.url);
         saveToHistory(item.url, item.name);
         saveLastPlaylist(playSeq.map(v => v.url));
         renderCurrentItems();
-
         if (window.Android) {
             window.Android.openVideoWithPlaylist(
                 JSON.stringify(allVideos.map(v => v.url)),
@@ -1056,29 +932,14 @@ function clickItem(idx) {
 }
 
 function goBack() {
-    // If on history tab, switch back to browse instead of navigating back
-    if (state.activeTab === 'history') {
-        showTab('browse');
-        return;
-    }
-    // If search is active, close it first instead of navigating back
-    if (state.searchActive) {
-        closeSearch();
-        return;
-    }
-    if (state.stack.length === 0) {
-        if (window.Android) window.Android.exitApp();
-        return;
-    }
-    if (state.stack.length === 1) {
-        showRoot();
-        return;
-    }
+    if (state.activeTab === 'history') { showTab('browse'); return; }
+    if (state.searchActive) { closeSearch(); return; }
+    if (state.stack.length === 0) { if (window.Android) window.Android.exitApp(); return; }
+    if (state.stack.length === 1) { showRoot(); return; }
     state.stack.pop();
     const parent = state.stack.pop();
     browse(parent.url, parent.title);
 }
-
 function jumpToBreadcrumb(idx) {
     if (idx < 0) { showRoot(); return; }
     const target = state.stack[idx];
@@ -1087,15 +948,9 @@ function jumpToBreadcrumb(idx) {
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
-
-/** Play All — starts from episode 1 with full playlist. */
 function playAll() {
     const videos = state.items.filter(i => i.isVideo);
     if (!videos.length) return;
-    // Only the episode that's actually about to start gets an optimistic
-    // mark. The rest get filled in for real if/when MX Player reports back
-    // how far the user actually got — no more "tapped Play All, instantly
-    // 12/12 watched" before anything's played.
     markWatched(videos[0].url);
     saveToHistory(videos[0].url, videos[0].name);
     saveLastPlaylist(videos.map(v => v.url));
@@ -1108,39 +963,16 @@ function playAll() {
         );
     }
 }
-
-/**
- * Resume Play — finds the first in-progress episode (real position data from
- * MX Player), or the first completely unwatched episode, or ep 1 if everything
- * is already watched. Passes the full playlist from that point forward so
- * MX Player's prev/next still covers the whole season.
- */
 function resumePlay() {
     const videos = state.items.filter(i => i.isVideo);
     if (!videos.length) return;
-
-    // 1. First episode with real in-progress data (stopped mid-way)
-    let resumeIdx = videos.findIndex(v => {
-        const rec = watchRecord(v.url);
-        return rec && !rec.completed && rec.percent > 0;
-    });
-
-    // 2. First completely unwatched episode
-    if (resumeIdx === -1) {
-        resumeIdx = videos.findIndex(v => !watchRecord(v.url));
-    }
-
-    // 3. Everything watched — restart from ep 1
+    let resumeIdx = videos.findIndex(v => { const r = watchRecord(v.url); return r && !r.completed && r.percent > 0; });
+    if (resumeIdx === -1) resumeIdx = videos.findIndex(v => !watchRecord(v.url));
     if (resumeIdx === -1) resumeIdx = 0;
-
     markWatched(videos[resumeIdx].url);
     saveToHistory(videos[resumeIdx].url, videos[resumeIdx].name);
-    // Playlist starts at the resume point so MX Player next/prev only
-    // goes forward from here — but we still pass the full array so
-    // MX Player knows the episode count.
     saveLastPlaylist(videos.slice(resumeIdx).map(v => v.url));
     renderCurrentItems();
-
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
             JSON.stringify(videos.map(v => v.url)),
@@ -1152,26 +984,32 @@ function resumePlay() {
 
 // ── UI HELPERS ────────────────────────────────────────────────────────────────
 
-function setContent(html) {
+/**
+ * Replace content area.
+ * @param {string}  html    - new innerHTML
+ * @param {boolean} animate - replay fade animation; skip during search to avoid lag
+ */
+function setContent(html, animate = true) {
     const el = document.getElementById('content');
     el.innerHTML = html;
     el.scrollTop = 0;
-    el.classList.remove('c-anim');
-    void el.offsetHeight; // force reflow so animation replays
-    el.classList.add('c-anim');
+    if (animate) {
+        el.classList.remove('c-anim');
+        void el.offsetHeight;
+        el.classList.add('c-anim');
+    }
 }
 
 function setHeader(title, showSearch) {
     document.getElementById('hdrTitle').textContent =
         title.length > 30 ? title.slice(0,28)+'…' : title;
-    document.getElementById('backBtn').style.display  = state.stack.length > 0 ? 'flex' : 'none';
+    document.getElementById('backBtn').style.display   = state.stack.length > 0 ? 'flex' : 'none';
     document.getElementById('searchBtn').style.display = showSearch ? '' : 'none';
 }
 
 function setBreadcrumb(stack) {
     const el = document.getElementById('bread');
     if (!stack.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
-
     el.style.display = 'flex';
     let html = `<span class="crumb" onclick="showRoot()">Home</span>`;
     stack.forEach((entry, i) => {
@@ -1179,71 +1017,55 @@ function setBreadcrumb(stack) {
         const label  = entry.title.length > 22 ? entry.title.slice(0,20)+'…' : entry.title;
         html += `<span class="crumb-sep">›</span>`;
         if (isLast) html += `<span class="crumb crumb-current">${esc(label)}</span>`;
-        else html += `<span class="crumb" onclick="jumpToBreadcrumb(${i})">${esc(label)}</span>`;
+        else        html += `<span class="crumb" onclick="jumpToBreadcrumb(${i})">${esc(label)}</span>`;
     });
     el.innerHTML  = html;
     el.scrollLeft = el.scrollWidth;
 }
 
-/**
- * Shows/hides the action bar (Play All / Shuffle + progress row).
- * Accepts the FULL unfiltered items array for the current folder
- * (or [] / false to hide) — computes completed/in-progress counts from it.
- */
 function setActionBar(items) {
-    const el = document.getElementById('actionBar');
+    const el     = document.getElementById('actionBar');
     const videos = Array.isArray(items) ? items.filter(i => i.isVideo) : [];
+    if (!videos.length) { el.style.display = 'none'; return; }
 
-    if (!videos.length) {
-        el.style.display = 'none';
-        return;
-    }
-
-    let completedCount  = 0;
-    let inProgressCount = 0;
+    let completedCount = 0, inProgressCount = 0;
     videos.forEach(v => {
         const rec = watchRecord(v.url);
         if (rec && rec.completed) completedCount++;
         else if (rec && rec.percent > 0) inProgressCount++;
     });
-
-    const pct = Math.round((completedCount / videos.length) * 100);
-    let text  = `${completedCount} / ${videos.length} episode${videos.length === 1 ? '' : 's'} watched`;
-    if (inProgressCount > 0) {
-        text += ` · ${inProgressCount} in progress`;
-    }
-
+    const pct  = Math.round((completedCount / videos.length) * 100);
+    let text   = `${completedCount} / ${videos.length} episode${videos.length === 1 ? '' : 's'} watched`;
+    if (inProgressCount > 0) text += ` · ${inProgressCount} in progress`;
     document.getElementById('progressText').textContent = text;
     document.getElementById('progressFill').style.width = pct + '%';
 
-    // Update Resume button label to show which episode it'll pick up from
+    // Resume label: use folder position (1-based) which is always correct.
+    // Also try SxxExx pattern as a fallback display override (e.g. S04E07 → Ep 7).
     const resumeTarget =
         videos.find(v => { const r = watchRecord(v.url); return r && !r.completed && r.percent > 0; }) ||
         videos.find(v => !watchRecord(v.url)) ||
         videos[0];
     if (resumeTarget) {
-        const epNum = extractEpNum(resumeTarget.name);
+        const folderPos = videos.findIndex(v => v.url === resumeTarget.url);
+        const sxxMatch  = resumeTarget.name.match(/S\d+E(\d{1,4})/i);
+        const epNum     = sxxMatch ? parseInt(sxxMatch[1], 10) : (folderPos + 1);
         document.getElementById('resumeBtn').textContent =
-            '\u23E9\u00A0 ' + (epNum ? 'Resume Ep ' + epNum : 'Resume');
+            '\u23E9\u00A0 Resume Ep ' + epNum;
     }
+
+    // Sync expand button state
+    const expandBtn = document.getElementById('expandBtn');
+    if (expandBtn) expandBtn.classList.toggle('active', state.expandAll);
 
     el.style.display = 'flex';
 }
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
-
 function loadHistory() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEYS.HISTORY);
-        return raw ? JSON.parse(raw) : [];
-    } catch (_) { return []; }
+    try { const r = localStorage.getItem(STORAGE_KEYS.HISTORY); return r ? JSON.parse(r) : []; }
+    catch (_) { return []; }
 }
-
-/**
- * Pushes a played episode to the front of the history list (newest first).
- * Deduplicates by URL so rewatching an episode just bumps it to the top.
- * Capped at 100 entries.
- */
 function saveToHistory(url, name, type = 'video') {
     try {
         let h = loadHistory().filter(e => e.url !== url);
@@ -1252,13 +1074,10 @@ function saveToHistory(url, name, type = 'video') {
         localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(h));
     } catch (_) {}
 }
-
 function clearHistory() {
     try { localStorage.removeItem(STORAGE_KEYS.HISTORY); } catch (_) {}
     renderHistory();
 }
-
-/** Relative time string: "Just now", "5m ago", "2h ago", "3d ago". */
 function timeAgo(ts) {
     const diff = Date.now() - ts;
     const m = Math.floor(diff / 60000);
@@ -1267,41 +1086,22 @@ function timeAgo(ts) {
     const h = Math.floor(m / 60);
     if (h < 24) return h + 'h ago';
     const d = Math.floor(h / 24);
-    if (d < 7)  return d + 'd ago';
-    return new Date(ts).toLocaleDateString();
+    return d < 7 ? d + 'd ago' : new Date(ts).toLocaleDateString();
 }
-
-/**
- * Extract episode number from a filename for the Resume button label.
- * Tries explicit episode tags (ep/episode/E) first, falls back to
- * the first 2–4 digit sequence in the name.
- */
-function extractEpNum(name) {
-    let m = name.match(/(?:ep(?:isode)?|[\s._-]E)[\s._-]*(\d+)/i);
-    if (m) return parseInt(m[1], 10);
-    m = name.match(/\b(\d{2,4})\b/);
-    if (m) return parseInt(m[1], 10);
-    return null;
-}
-
-/** Renders the history tab content into #historyView. */
 function renderHistory() {
     const el      = document.getElementById('historyView');
     const history = loadHistory();
-
     if (!history.length) {
         el.innerHTML = `<div class="state-center">
-            <div style="font-size:36px">🕒</div>
-            <span>No history yet</span>
-            <span style="font-size:12px;color:var(--dim)">Episodes you play will appear here</span>
+            <div style="font-size:38px">🕒</div>
+            <span style="font-weight:600">No history yet</span>
+            <span style="font-size:12px;color:var(--dim)">Episodes and folders you visit will appear here</span>
         </div>`;
         return;
     }
-
     const rows = history.map((entry, i) => {
         const delay    = Math.min(i * 22, 220);
         const isFolder = (entry.type || 'video') === 'folder';
-
         if (isFolder) {
             return `<div class="fitem" style="animation-delay:${delay}ms" onclick="browseHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
                 <div class="ficon fi-dir">📁</div>
@@ -1312,24 +1112,13 @@ function renderHistory() {
                 <div class="farrow">›</div>
             </div>`;
         }
-
-        const rec        = watchRecord(entry.url);
+        const rec = watchRecord(entry.url);
         const completed  = !!(rec && rec.completed);
         const percent    = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
         const inProgress = !completed && percent > 0;
-
-        let iconClass = 'fi-video';
-        let iconGlyph = '▶';
-        let tagHtml   = '';
-        if (completed) {
-            iconClass = 'fi-video fi-watched';
-            iconGlyph = '✓';
-            tagHtml   = ' · <span class="watched-tag">Watched</span>';
-        } else if (inProgress) {
-            iconClass = 'fi-video fi-progress';
-            tagHtml   = ' · <span class="progress-tag">' + percent + '% watched</span>';
-        }
-
+        let iconClass = 'fi-video', iconGlyph = '▶', tagHtml = '';
+        if (completed)   { iconClass = 'fi-video fi-watched'; iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
+        else if (inProgress) { iconClass = 'fi-video fi-progress'; tagHtml = ` · <span class="progress-tag">${percent}% watched</span>`; }
         return `<div class="fitem" style="animation-delay:${delay}ms" onclick="playHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
             <div class="ficon ${iconClass}">${iconGlyph}</div>
             <div class="finfo">
@@ -1339,102 +1128,70 @@ function renderHistory() {
             <div class="farrow farrow-play">▶</div>
         </div>`;
     }).join('');
-
     el.innerHTML = `
-        <div style="display:flex;align-items:center;padding:14px 12px 6px;">
+        <div style="display:flex;align-items:center;padding:14px 14px 6px;">
             <span class="hist-section-title">Recently Watched</span>
             <button onclick="clearHistory()" style="margin-left:auto;border:1px solid var(--border);
-                background:none;color:var(--dim);font-size:11px;cursor:pointer;
-                padding:4px 10px;border-radius:6px;">Clear</button>
+                background:none;color:var(--dim);font-size:11px;font-family:inherit;font-weight:500;
+                cursor:pointer;padding:5px 12px;border-radius:8px;">Clear</button>
         </div>
         <div>${rows}</div>`;
 }
-
-/**
- * Tap a history entry → open that episode directly in MX Player.
- * Single-video launch (no playlist) since we don't have the folder context here.
- */
 function playHistoryItem(url, name) {
     saveLastPlaylist([url]);
     if (window.Android) {
-        window.Android.openVideoWithPlaylist(
-            JSON.stringify([url]),
-            JSON.stringify([name]),
-            0
-        );
+        window.Android.openVideoWithPlaylist(JSON.stringify([url]), JSON.stringify([name]), 0);
     } else {
         window.open(url, '_blank');
     }
 }
-
-/**
- * Tap a folder history entry → switch back to browse tab and open the folder.
- */
 function browseHistoryItem(url, name) {
     showTab('browse');
     browse(url, name);
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────────
-
-/**
- * Switch between Browse and History tabs.
- * Browse tab restores the full header/breadcrumb/action-bar state.
- * History tab overrides the header and hides browse-only chrome.
- */
 function showTab(tab) {
     state.activeTab = tab;
     const isBrowse  = tab === 'browse';
-
     document.getElementById('content').style.display     = isBrowse ? '' : 'none';
     document.getElementById('historyView').style.display = isBrowse ? 'none' : 'block';
     document.getElementById('tabBrowse').classList.toggle('tab-active',  isBrowse);
     document.getElementById('tabHistory').classList.toggle('tab-active', !isBrowse);
-
     if (!isBrowse) {
-        // replay fade animation on history view
         const hv = document.getElementById('historyView');
-        hv.classList.remove('h-anim');
-        void hv.offsetHeight;
-        hv.classList.add('h-anim');
+        hv.classList.remove('h-anim'); void hv.offsetHeight; hv.classList.add('h-anim');
     }
-
     if (isBrowse) {
         document.getElementById('hdrBadge').style.display = '';
         const inFolder = state.stack.length > 0;
-        setHeader(
-            inFolder ? state.stack[state.stack.length - 1].title : 'CircleFTP Browser',
-            inFolder
-        );
+        setHeader(inFolder ? state.stack[state.stack.length-1].title : 'CircleFTP Browser', inFolder);
         setBreadcrumb(state.stack);
         setActionBar(state.items);
     } else {
-        // Quietly reset search state without triggering a browse re-render
         if (state.searchActive) {
-            state.searchActive = false;
-            state.searchQuery  = '';
+            state.searchActive = false; state.searchQuery = '';
             document.getElementById('searchInput').value = '';
             document.getElementById('searchWrap').classList.remove('active');
             document.getElementById('searchClear').classList.remove('visible');
+            document.getElementById('searchClose').classList.remove('visible');
         }
-        document.getElementById('hdrBadge').style.display    = 'none';
-        document.getElementById('hdrTitle').textContent       = 'History';
-        document.getElementById('backBtn').style.display      = 'none';
-        document.getElementById('searchBtn').style.display    = 'none';
-        document.getElementById('bread').style.display        = 'none';
-        document.getElementById('actionBar').style.display    = 'none';
+        document.getElementById('hdrBadge').style.display   = 'none';
+        document.getElementById('hdrTitle').textContent      = 'History';
+        document.getElementById('backBtn').style.display     = 'none';
+        document.getElementById('searchBtn').style.display   = 'none';
+        document.getElementById('bread').style.display       = 'none';
+        document.getElementById('actionBar').style.display   = 'none';
         renderHistory();
     }
 }
 
 // ── ESCAPING ──────────────────────────────────────────────────────────────────
-
 function esc(s) {
     return String(s)
         .replace(/&/g,'&amp;').replace(/</g,'&lt;')
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-
 function escAttr(s) {
     return String(s)
         .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
