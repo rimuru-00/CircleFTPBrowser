@@ -6,26 +6,24 @@
       maximum-scale=1.0, user-scalable=no">
 <title>CircleFTP</title>
 <style>
-/* ─── Reset & tokens ────────────────────────────────────────────────────── */
+/* ─── Reset & tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
     margin: 0; padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
 :root {
-    --bg:        #0d0d0d;
-    --surface:   #161616;
-    --surface2:  #1f1f1f;
-    --border:    #282828;
-    --accent:    #ff5722;
-    --folder:    #ffa726;
-    --video:     #42a5f5;
-    --text:      #e0e0e0;
-    --dim:       #737373;
-    --radius:    10px;
+    --bg:       #0d0d0d;
+    --surface:  #161616;
+    --surface2: #1f1f1f;
+    --border:   #282828;
+    --accent:   #ff5722;
+    --folder:   #ffa726;
+    --video:    #42a5f5;
+    --text:     #e0e0e0;
+    --dim:      #737373;
+    --radius:   10px;
 }
-
-/* ─── Layout shell ──────────────────────────────────────────────────────── */
 html, body {
     height: 100%;
     overflow: hidden;
@@ -35,12 +33,9 @@ html, body {
                  'Helvetica Neue', sans-serif;
     -webkit-font-smoothing: antialiased;
 }
-body {
-    display: flex;
-    flex-direction: column;
-}
+body { display: flex; flex-direction: column; }
 
-/* ─── Header ────────────────────────────────────────────────────────────── */
+/* ─── Header ─────────────────────────────────────────────────────────────── */
 #header {
     flex-shrink: 0;
     height: 56px;
@@ -49,47 +44,63 @@ body {
     display: flex;
     align-items: center;
     padding: 0 8px 0 4px;
-    gap: 6px;
+    gap: 4px;
     z-index: 20;
 }
-#backBtn {
-    display: none;  /* shown when stack.length > 0 */
-    width: 44px;
-    height: 44px;
-    border: none;
-    background: none;
+.hdr-icon-btn {
+    width: 44px; height: 44px;
+    border: none; background: none;
     color: var(--text);
-    font-size: 26px;
-    line-height: 1;
-    border-radius: 50%;
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
+    font-size: 24px; line-height: 1;
+    border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
-#backBtn:active { background: var(--surface2); }
+.hdr-icon-btn:active { background: var(--surface2); }
 #hdrTitle {
     flex: 1;
-    font-size: 17px;
-    font-weight: 500;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+    font-size: 17px; font-weight: 500;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .hdr-badge {
     flex-shrink: 0;
-    background: var(--accent);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    padding: 3px 8px;
-    border-radius: 12px;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    padding: 3px 8px; border-radius: 12px;
 }
 
-/* ─── Breadcrumb ────────────────────────────────────────────────────────── */
+/* ─── Search input (replaces title in header) ────────────────────────────── */
+#searchWrap {
+    flex: 1;
+    display: none; /* shown when search is active */
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 0 12px;
+    height: 38px;
+    gap: 8px;
+}
+#searchWrap.active { display: flex; }
+#searchInput {
+    flex: 1;
+    background: none; border: none; outline: none;
+    color: var(--text);
+    font-size: 15px;
+    caret-color: var(--accent);
+}
+#searchInput::placeholder { color: var(--dim); }
+#searchClear {
+    background: none; border: none;
+    color: var(--dim); font-size: 18px;
+    cursor: pointer; padding: 0;
+    display: none;
+}
+#searchClear.visible { display: block; }
+
+/* ─── Breadcrumb ─────────────────────────────────────────────────────────── */
 #bread {
-    display: none; /* shown when stack.length > 0 */
+    display: none;
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -103,25 +114,17 @@ body {
 }
 #bread::-webkit-scrollbar { display: none; }
 .crumb {
-    font-size: 12px;
-    color: var(--dim);
-    padding: 4px 5px;
-    border-radius: 4px;
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
+    font-size: 12px; color: var(--dim);
+    padding: 4px 5px; border-radius: 4px;
+    cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .crumb:not(.crumb-current):active { background: var(--surface2); }
 .crumb-current { color: var(--text); cursor: default; }
-.crumb-sep {
-    font-size: 12px;
-    color: var(--border);
-    flex-shrink: 0;
-}
+.crumb-sep { font-size: 12px; color: var(--border); flex-shrink: 0; }
 
-/* ─── Action bar (Play All / M3U) ───────────────────────────────────────── */
+/* ─── Action bar ─────────────────────────────────────────────────────────── */
 #actionBar {
-    display: none; /* shown when current folder contains video files */
+    display: none;
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -129,28 +132,18 @@ body {
     gap: 8px;
 }
 .ab-btn {
-    flex: 1;
-    height: 38px;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
+    flex: 1; height: 38px;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 600;
     cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    letter-spacing: 0.2px;
+    display: inline-flex; align-items: center;
+    justify-content: center; gap: 6px;
 }
 .ab-btn:active { opacity: 0.75; }
-.ab-fill   { background: var(--accent); color: #fff; }
-.ab-outline {
-    background: transparent;
-    color: var(--dim);
-    border: 1px solid var(--border);
-}
+.ab-fill    { background: var(--accent); color: #fff; }
+.ab-outline { background: transparent; color: var(--dim); border: 1px solid var(--border); }
 
-/* ─── Scrollable content area ───────────────────────────────────────────── */
+/* ─── Scroll content ─────────────────────────────────────────────────────── */
 #content {
     flex: 1;
     overflow-y: auto;
@@ -160,130 +153,94 @@ body {
 #content::-webkit-scrollbar-thumb { background: var(--border); }
 
 /* ─── Root cards ─────────────────────────────────────────────────────────── */
-.root-list {
-    padding: 16px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+.root-list { padding: 16px 12px; display: flex; flex-direction: column; gap: 10px; }
 .root-card {
-    display: flex;
-    align-items: center;
-    gap: 14px;
+    display: flex; align-items: center; gap: 14px;
     padding: 16px 14px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    cursor: pointer;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; cursor: pointer;
 }
 .root-card:active { background: var(--surface2); }
 .root-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 12px;
-    background: rgba(255, 87, 34, 0.12);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    flex-shrink: 0;
+    width: 50px; height: 50px; border-radius: 12px;
+    background: rgba(255,87,34,.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
 }
 .root-info { flex: 1; min-width: 0; }
 .root-name { font-size: 15px; font-weight: 600; }
-.root-desc {
-    font-size: 11px;
-    color: var(--dim);
-    margin-top: 3px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
+.root-desc { font-size: 11px; color: var(--dim); margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ─── File / Folder list ────────────────────────────────────────────────── */
+/* ─── File / folder list ─────────────────────────────────────────────────── */
 .fitem {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 12px;
-    height: 64px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px; height: 64px;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
 }
 .fitem:active { background: var(--surface2); }
 .ficon {
-    width: 42px;
-    height: 42px;
-    border-radius: var(--radius);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    flex-shrink: 0;
+    width: 42px; height: 42px; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
 }
-.fi-dir   { background: rgba(255, 167, 38, 0.12); color: var(--folder); }
-.fi-video { background: rgba( 66, 165, 245, 0.12); color: var(--video);  }
+.fi-dir   { background: rgba(255,167,38,.12); color: var(--folder); }
+.fi-video { background: rgba( 66,165,245,.12); color: var(--video); }
 .finfo { flex: 1; min-width: 0; }
-.fname {
-    font-size: 13.5px;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-}
-.fmeta {
-    font-size: 11px;
-    color: var(--dim);
-    margin-top: 3px;
-}
-.farrow { font-size: 18px; color: var(--border); flex-shrink: 0; }
+.fname { font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.fmeta { font-size: 11px; color: var(--dim); margin-top: 3px; }
+.farrow      { font-size: 18px; color: var(--border); flex-shrink: 0; }
 .farrow-play { color: var(--video); font-size: 14px; }
 
-/* ─── States: loading / error / empty ───────────────────────────────────── */
+/* highlight matched search chars */
+.match { color: var(--accent); font-weight: 600; }
+
+/* ─── States ─────────────────────────────────────────────────────────────── */
 .state-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 220px;
-    gap: 14px;
-    color: var(--dim);
-    font-size: 14px;
-    text-align: center;
-    padding: 24px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 220px; gap: 14px;
+    color: var(--dim); font-size: 14px;
+    text-align: center; padding: 24px;
 }
 .spinner {
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     border: 3px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
-    animation: spin 0.75s linear infinite;
+    animation: spin .75s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 .retry-btn {
-    margin-top: 8px;
-    padding: 8px 20px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: none;
-    color: var(--text);
-    font-size: 13px;
-    cursor: pointer;
+    margin-top: 8px; padding: 8px 20px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: none; color: var(--text);
+    font-size: 13px; cursor: pointer;
 }
 .retry-btn:active { background: var(--surface2); }
-.err-msg {
-    font-size: 12px;
-    color: var(--dim);
-    word-break: break-word;
-}
+.err-msg { font-size: 12px; color: var(--dim); word-break: break-word; }
+
+/* search empty state */
+.no-results { font-size: 28px; margin-bottom: 4px; }
 </style>
 </head>
 <body>
 
 <!-- ── Header ─────────────────────────────────────────────────────────── -->
 <div id="header">
-    <button id="backBtn" onclick="goBack()">‹</button>
-    <div id="hdrTitle">CircleFTP Browser</div>
-    <div class="hdr-badge">FTP</div>
+    <button id="backBtn"   class="hdr-icon-btn" style="display:none" onclick="goBack()">‹</button>
+    <div    id="hdrTitle">CircleFTP Browser</div>
+    <!-- search input — hidden until searchBtn tapped -->
+    <div id="searchWrap">
+        <span style="color:var(--dim);font-size:16px">⌕</span>
+        <input id="searchInput" type="search" placeholder="Search…"
+               autocomplete="off" autocorrect="off" spellcheck="false"
+               oninput="onSearchInput(this.value)">
+        <button id="searchClear" onclick="clearSearch()">✕</button>
+    </div>
+    <button id="searchBtn" class="hdr-icon-btn" style="display:none" onclick="toggleSearch()">⌕</button>
+    <div    id="hdrBadge"  class="hdr-badge">FTP</div>
 </div>
 
 <!-- ── Breadcrumb ─────────────────────────────────────────────────────── -->
@@ -292,19 +249,17 @@ body {
 <!-- ── Action bar ─────────────────────────────────────────────────────── -->
 <div id="actionBar" style="display:none; flex-direction:row;">
     <button class="ab-btn ab-fill"    onclick="playAll()">▶&nbsp; Play All</button>
-    <button class="ab-btn ab-outline" onclick="downloadM3U()">⬇&nbsp; M3U</button>
+    <button class="ab-btn ab-outline" onclick="shufflePlay()">⇄&nbsp; Shuffle</button>
 </div>
 
-<!-- ── Main content (dynamically populated) ───────────────────────────── -->
+<!-- ── Content ────────────────────────────────────────────────────────── -->
 <div id="content"></div>
 
 
 <script>
 "use strict";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIG — edit roots here to add more FTP servers / directories
-// ─────────────────────────────────────────────────────────────────────────────
+// ── CONFIG ────────────────────────────────────────────────────────────────────
 const CONFIG = {
     roots: [
         {
@@ -313,145 +268,101 @@ const CONFIG = {
             url  : "http://ftp15.circleftp.net/FILE/English%20%26%20Foreign%20Anime%20Series/",
             desc : "ftp15.circleftp.net"
         }
-        // Add more entries here, e.g.:
-        // { name: "Movies", icon: "🎬", url: "http://ftp15.circleftp.net/FILE/Movies/", desc: "ftp15.circleftp.net" }
+        // Add more roots here
     ],
-    videoExts: ['.mkv', '.mp4', '.avi', '.m4v', '.webm', '.ts',
-                '.flv', '.wmv', '.m2ts', '.mov', '.rmvb']
+    videoExts: ['.mkv','.mp4','.avi','.m4v','.webm','.ts',
+                '.flv','.wmv','.m2ts','.mov','.rmvb']
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// App state
-// ─────────────────────────────────────────────────────────────────────────────
+// ── STATE ─────────────────────────────────────────────────────────────────────
 const state = {
-    stack: [],   // Array of { url: string, title: string } — navigation history
-    items: []    // Current folder's parsed items (used by Play All)
+    stack       : [],   // navigation history: [{url, title}]
+    items       : [],   // full unfiltered items in current folder
+    searchQuery : '',   // current search string
+    searchActive: false
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PARSING — fetch + parse h5ai directory listing HTML
-// ─────────────────────────────────────────────────────────────────────────────
+// ── PARSING ───────────────────────────────────────────────────────────────────
 
 function isVideoFile(name) {
     const lower = name.toLowerCase();
     return CONFIG.videoExts.some(ext => lower.endsWith(ext));
 }
 
-/**
- * Fetch an h5ai directory URL and return an array of item objects.
- * h5ai serves a static HTML listing that is fully present in the initial
- * GET response (no JS rendering required).
- *
- * Each returned item: { name, url, isDir, isVideo, size }
- */
 async function fetchDirectory(url) {
     const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = await res.text();
     return parseH5aiHtml(html, url);
 }
 
 function parseH5aiHtml(html, baseUrl) {
-    const origin  = new URL(baseUrl).origin;   // e.g. "http://ftp15.circleftp.net"
-    const parser  = new DOMParser();
-    const doc     = parser.parseFromString(html, 'text/html');
-    const items   = [];
-    const seenUrl = new Set();
+    const origin = new URL(baseUrl).origin;
+    const doc    = new DOMParser().parseFromString(html, 'text/html');
+    const items  = [];
+    const seen   = new Set();
 
-    // Names that are h5ai navigation/UI links — never content
-    const SKIP_NAMES = new Set([
-        '..', 'Parent Directory', 'Name', 'Last modified', 'Size',
-        'modern browsers', 'powered by h5ai', ''
-    ]);
+    const SKIP = new Set(['..','Parent Directory','Name','Last modified','Size',
+                          'modern browsers','powered by h5ai','']);
 
     doc.querySelectorAll('a[href]').forEach(a => {
         const href    = (a.getAttribute('href') || '').trim();
         const rawName = a.textContent.trim();
 
-        // ── Filter non-content links ──────────────────────────────────────
-        if (!href || !rawName)                    return;
-        if (SKIP_NAMES.has(rawName))              return;
-        if (href === '..' || href === '../')       return;
-        if (href.startsWith('?'))                  return;
-        if (href.startsWith('#'))                  return;
-        if (href.includes('larsjung.de'))          return;
-        if (href.includes('browsehappy.com'))      return;
-        if (href.startsWith('mailto:'))            return;
+        if (!href || !rawName)             return;
+        if (SKIP.has(rawName))             return;
+        if (href === '..' || href==='../')  return;
+        if (href.startsWith('?'))           return;
+        if (href.startsWith('#'))           return;
+        if (href.includes('larsjung.de'))   return;
+        if (href.includes('browsehappy'))   return;
+        if (href.startsWith('mailto:'))     return;
 
-        // ── Build absolute URL ────────────────────────────────────────────
         let fullUrl;
         if (href.startsWith('/')) {
-            // Absolute path — most common in h5ai (e.g. /FILE/Anime/...)
             fullUrl = origin + href;
         } else if (href.startsWith('http://') || href.startsWith('https://')) {
-            // External absolute URL
-            // Only include if it's on the same host (to avoid UI/CDN links)
             if (!href.startsWith(origin)) return;
             fullUrl = href;
         } else {
-            // Relative path
             try { fullUrl = new URL(href, baseUrl).href; }
-            catch (e) { return; }
+            catch (_) { return; }
         }
 
-        if (seenUrl.has(fullUrl)) return;
-        seenUrl.add(fullUrl);
+        if (seen.has(fullUrl)) return;
+        seen.add(fullUrl);
 
-        // ── Decode display name ───────────────────────────────────────────
-        // The link text from h5ai is already the decoded filename.
-        // Attempt another decode pass in case it's double-encoded.
         let name = rawName;
-        try { name = decodeURIComponent(rawName); } catch (_) { /* keep rawName */ }
+        try { name = decodeURIComponent(rawName); } catch (_) {}
 
-        // ── Determine type ────────────────────────────────────────────────
-        const isDir = fullUrl.endsWith('/');
+        const isDir   = fullUrl.endsWith('/');
+        const isVideo = !isDir && isVideoFile(name);
+        const size    = extractSize(a, isDir);
 
-        // ── Extract file size ─────────────────────────────────────────────
-        // h5ai puts size in a sibling element (varies by version/theme).
-        // We walk up the DOM and try several known patterns.
-        const size = extractSize(a, isDir);
-
-        items.push({ name, url: fullUrl, isDir, isVideo: !isDir && isVideoFile(name), size });
+        items.push({ name, url: fullUrl, isDir, isVideo, size });
     });
 
     return items;
 }
 
-/**
- * Walk up from an <a> element and look for size text nearby.
- * h5ai v0.29.2 typically uses one of:
- *   - A <td> with class "size" in the same <tr>
- *   - A <span> with class "size" in the same list item
- *   - A data-size attribute on a parent element
- * Returns a formatted string like "1.58 GB" or "" if not found.
- */
 function extractSize(anchorEl, isDir) {
-    if (isDir) return ''; // directories have no size
-
+    if (isDir) return '';
     let el = anchorEl;
-    for (let depth = 0; depth < 6; depth++) {
+    for (let d = 0; d < 6; d++) {
         el = el.parentElement;
         if (!el) break;
-
-        // Pattern 1: element with class "size"
-        const sizeEl = el.querySelector('.size, [class*="size"]');
+        const sizeEl = el.querySelector('.size,[class*="size"]');
         if (sizeEl) {
             const t = sizeEl.textContent.trim();
             if (/\d/.test(t) && t.length < 25) return formatSize(t);
         }
-
-        // Pattern 2: <tr> — look at the last <td> which h5ai uses for size
         if (el.tagName === 'TR') {
             const tds = el.querySelectorAll('td');
             if (tds.length >= 2) {
-                const last = tds[tds.length - 1].textContent.trim();
-                if (/\d+\s*KB/i.test(last) || /\d+\s*MB/i.test(last)) {
-                    return formatSize(last);
-                }
+                const last = tds[tds.length-1].textContent.trim();
+                if (/\d+\s*KB/i.test(last)||/\d+\s*MB/i.test(last)) return formatSize(last);
             }
         }
-
-        // Pattern 3: data-size attribute (some h5ai builds)
         if (el.hasAttribute('data-size')) {
             const v = el.getAttribute('data-size');
             if (/\d/.test(v)) return formatSize(v);
@@ -460,45 +371,116 @@ function extractSize(anchorEl, isDir) {
     return '';
 }
 
-/**
- * Convert a raw size string (e.g. "1659962 KB", "1234567890") to a
- * human-readable string ("1.58 GB", "1.23 GB", etc.)
- */
 function formatSize(raw) {
     if (!raw) return '';
-
-    // Match patterns: "1234 KB", "1234 MB", "1234 GB", or bare bytes
     const m = raw.trim().match(/^([\d,]+)\s*(KB|MB|GB|B)?$/i);
-    if (!m) return raw.trim().slice(0, 12); // unknown format, show as-is (trimmed)
-
-    let bytes = parseInt(m[1].replace(/,/g, ''), 10);
-    const unit = (m[2] || 'B').toUpperCase();
-
-    if (unit === 'KB') bytes *= 1024;
-    else if (unit === 'MB') bytes *= 1024 * 1024;
-    else if (unit === 'GB') bytes *= 1024 * 1024 * 1024;
-
-    if (bytes >= 1_073_741_824) return (bytes / 1_073_741_824).toFixed(2) + ' GB';
-    if (bytes >= 1_048_576)     return (bytes / 1_048_576).toFixed(0)     + ' MB';
-    if (bytes >= 1024)          return (bytes / 1024).toFixed(0)           + ' KB';
-    return bytes + ' B';
+    if (!m) return raw.trim().slice(0,12);
+    let bytes = parseInt(m[1].replace(/,/g,''), 10);
+    const u = (m[2]||'B').toUpperCase();
+    if (u==='KB') bytes *= 1024;
+    else if (u==='MB') bytes *= 1048576;
+    else if (u==='GB') bytes *= 1073741824;
+    if (bytes >= 1073741824) return (bytes/1073741824).toFixed(2)+' GB';
+    if (bytes >= 1048576)    return (bytes/1048576).toFixed(0)+' MB';
+    if (bytes >= 1024)       return (bytes/1024).toFixed(0)+' KB';
+    return bytes+' B';
 }
 
+// ── SEARCH ────────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NAVIGATION
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Fuzzy word search: splits query by spaces, every word must appear
+ * somewhere in the name (case-insensitive). Handles:
+ *   "attack titan"  → Attack on Titan ✓
+ *   "one piece"     → One Piece ✓
+ *   "naruto shipp"  → Naruto Shippuden ✓
+ */
+function matchesSearch(name, query) {
+    if (!query.trim()) return true;
+    const lName  = name.toLowerCase();
+    const words  = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    return words.every(w => lName.includes(w));
+}
 
-/** Show the root cards (initial screen). Clears navigation stack. */
+/**
+ * Highlight matching words in a name string for display.
+ * Returns safe HTML with <span class="match"> around matched segments.
+ */
+function highlightName(name, query) {
+    if (!query.trim()) return esc(name);
+    const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    // Build a regex that matches any of the words (case-insensitive)
+    const pattern = new RegExp(
+        '(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')',
+        'gi'
+    );
+    return esc(name).replace(pattern, '<span class="match">$1</span>');
+}
+
+function toggleSearch() {
+    if (state.searchActive) {
+        closeSearch();
+    } else {
+        openSearch();
+    }
+}
+
+function openSearch() {
+    state.searchActive = true;
+    state.searchQuery  = '';
+    document.getElementById('hdrTitle').style.display    = 'none';
+    document.getElementById('hdrBadge').style.display    = 'none';
+    document.getElementById('searchBtn').style.display   = 'none';
+    document.getElementById('searchWrap').classList.add('active');
+    const inp = document.getElementById('searchInput');
+    inp.value = '';
+    inp.focus();
+    renderCurrentItems();
+}
+
+function closeSearch() {
+    state.searchActive = false;
+    state.searchQuery  = '';
+    document.getElementById('searchInput').value          = '';
+    document.getElementById('searchWrap').classList.remove('active');
+    document.getElementById('searchClear').classList.remove('visible');
+    // Restore header elements
+    document.getElementById('hdrTitle').style.display    = '';
+    document.getElementById('hdrBadge').style.display    = '';
+    if (state.stack.length > 0)
+        document.getElementById('searchBtn').style.display = '';
+    renderCurrentItems();
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    state.searchQuery = '';
+    document.getElementById('searchClear').classList.remove('visible');
+    renderCurrentItems();
+    document.getElementById('searchInput').focus();
+}
+
+function onSearchInput(val) {
+    state.searchQuery = val;
+    const clearBtn = document.getElementById('searchClear');
+    if (val.length > 0) clearBtn.classList.add('visible');
+    else                clearBtn.classList.remove('visible');
+    renderCurrentItems();
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────────────────
+
 function showRoot() {
+    // Close search if open
+    if (state.searchActive) closeSearch();
     state.stack = [];
     state.items = [];
 
-    setHeader('CircleFTP Browser');
+    setHeader('CircleFTP Browser', false);
     setBreadcrumb([]);
     setActionBar(false);
 
-    const cards = CONFIG.roots.map((r, i) => `
+    const cards = CONFIG.roots.map((r,i) => `
         <div class="root-card" onclick="browseRoot(${i})">
             <div class="root-icon">${r.icon}</div>
             <div class="root-info">
@@ -511,70 +493,73 @@ function showRoot() {
     setContent(`<div class="root-list">${cards}</div>`);
 }
 
-/** Browse a root entry by CONFIG index. */
 function browseRoot(idx) {
     const r = CONFIG.roots[idx];
     browse(r.url, r.name);
 }
 
-/**
- * Navigate into a folder URL.
- * Pushes to stack, fetches listing, renders items.
- */
 async function browse(url, title) {
-    state.stack.push({ url, title });
+    // Reset search when navigating
+    if (state.searchActive) closeSearch();
+    state.searchQuery = '';
 
-    setHeader(title);
+    state.stack.push({ url, title });
+    setHeader(title, true);
     setBreadcrumb(state.stack);
     setActionBar(false);
-    setContent(`
-        <div class="state-center">
-            <div class="spinner"></div>
-            <span>Loading…</span>
-        </div>`);
+    setContent(`<div class="state-center"><div class="spinner"></div><span>Loading…</span></div>`);
 
     try {
         const items  = await fetchDirectory(url);
         state.items  = items;
-        renderItems(items);
+        renderCurrentItems();
     } catch (err) {
-        // Pop the failed entry so back-navigation still works correctly
         state.stack.pop();
         setBreadcrumb(state.stack);
+        const safeUrl   = escAttr(url);
+        const safeTitle = escAttr(title);
         setContent(`
             <div class="state-center">
                 <div style="font-size:28px">⚠️</div>
                 <span>Could not load folder</span>
                 <span class="err-msg">${esc(err.message)}</span>
                 <button class="retry-btn"
-                    onclick="browse('${escAttr(url)}','${escAttr(title)}')">
-                    Retry
-                </button>
+                    onclick="browse('${safeUrl}','${safeTitle}')">Retry</button>
             </div>`);
     }
 }
 
-/**
- * Render a list of items into the content area.
- * Stores items in a JS array so onclick handlers use index, not embedded strings.
- */
-function renderItems(items) {
-    // Items array is already stored as state.items; use index-based onclick
-    const hasVideo = items.some(i => i.isVideo);
+/** Re-render the current items respecting any active search filter. */
+function renderCurrentItems() {
+    renderItems(state.items, state.searchQuery);
+}
+
+function renderItems(allItems, query) {
+    // Pair each item with its original index in state.items
+    // so clickItem() can always reference the full unfiltered array.
+    const filtered = allItems
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => matchesSearch(item.name, query));
+
+    // Action bar: show when the FULL folder has videos (not filtered count)
+    const hasVideo = allItems.some(i => i.isVideo);
     setActionBar(hasVideo);
 
-    if (!items.length) {
-        setContent('<div class="state-center">📂 This folder is empty</div>');
+    if (!filtered.length) {
+        const msg = query.trim()
+            ? `<div class="no-results">🔍</div><span>No results for "<b>${esc(query)}</b>"</span>`
+            : '📂 This folder is empty';
+        setContent(`<div class="state-center">${msg}</div>`);
         return;
     }
 
-    const rows = items.map((item, idx) => {
+    const rows = filtered.map(({ item, idx }) => {
         if (item.isDir) {
             return `
             <div class="fitem" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
-                    <div class="fname">${esc(item.name)}</div>
+                    <div class="fname">${highlightName(item.name, query)}</div>
                     <div class="fmeta">Folder</div>
                 </div>
                 <div class="farrow">›</div>
@@ -586,21 +571,19 @@ function renderItems(items) {
             <div class="fitem" onclick="clickItem(${idx})">
                 <div class="ficon fi-video">▶</div>
                 <div class="finfo">
-                    <div class="fname">${esc(item.name)}</div>
+                    <div class="fname">${highlightName(item.name, query)}</div>
                     <div class="fmeta">${meta}</div>
                 </div>
                 <div class="farrow farrow-play">▶</div>
             </div>`;
         }
-        // Non-video files (subtitles, nfo, etc.) — show dimmed, no play arrow
+        // Non-video file (subs, nfo…)
         return `
-            <div class="fitem" style="opacity:0.45; cursor:default">
-                <div class="ficon" style="background:rgba(115,115,115,.1);color:var(--dim)">
-                    📄
-                </div>
+            <div class="fitem" style="opacity:.4;cursor:default">
+                <div class="ficon" style="background:rgba(115,115,115,.1);color:var(--dim)">📄</div>
                 <div class="finfo">
                     <div class="fname">${esc(item.name)}</div>
-                    <div class="fmeta">${esc(item.size || 'File')}</div>
+                    <div class="fmeta">${esc(item.size||'File')}</div>
                 </div>
             </div>`;
     }).join('');
@@ -609,8 +592,10 @@ function renderItems(items) {
 }
 
 /**
- * Handle a tap on a list item (folder or video).
- * Uses index into state.items to avoid any string-escaping issues with names.
+ * Handle tap on a list item.
+ * idx = original index in state.items (not filtered position).
+ * For videos: always passes the FULL episode list to MX Player
+ * so prev/next works across the whole season even if search was active.
  */
 function clickItem(idx) {
     const item = state.items[idx];
@@ -618,92 +603,86 @@ function clickItem(idx) {
 
     if (item.isDir) {
         browse(item.url, item.name);
-    } else if (item.isVideo) {
-        // Pass full URL and display name to MX Player via Java bridge
+        return;
+    }
+
+    if (item.isVideo) {
+        // Build full ordered video list from the unfiltered state.items
+        const allVideos = state.items.filter(i => i.isVideo);
+        const startAt   = allVideos.findIndex(v => v.url === item.url);
+
         if (window.Android) {
-            window.Android.openVideo(item.url, item.name);
+            window.Android.openVideoWithPlaylist(
+                JSON.stringify(allVideos.map(v => v.url)),
+                JSON.stringify(allVideos.map(v => v.name)),
+                Math.max(0, startAt)
+            );
         } else {
-            // Browser fallback during development
             window.open(item.url, '_blank');
         }
     }
 }
 
-/**
- * Hardware back button handler.
- * Called by MainActivity.onBackPressed() via evaluateJavascript("goBack()", null).
- */
 function goBack() {
+    // If search is active, close it first instead of navigating back
+    if (state.searchActive) {
+        closeSearch();
+        return;
+    }
     if (state.stack.length === 0) {
-        // Already at root — exit the app
         if (window.Android) window.Android.exitApp();
         return;
     }
     if (state.stack.length === 1) {
-        // One level deep — go back to root cards
         showRoot();
         return;
     }
-    // Go up one folder
-    state.stack.pop();                         // remove current folder
-    const parent = state.stack.pop();          // remove parent (browse re-pushes it)
+    state.stack.pop();
+    const parent = state.stack.pop();
     browse(parent.url, parent.title);
 }
 
-/** Jump to a specific breadcrumb index. */
 function jumpToBreadcrumb(idx) {
-    // idx is the 0-based index in state.stack we want to jump TO.
     if (idx < 0) { showRoot(); return; }
     const target = state.stack[idx];
-    state.stack   = state.stack.slice(0, idx); // trim stack (browse will re-push target)
+    state.stack  = state.stack.slice(0, idx);
     browse(target.url, target.title);
 }
 
+// ── PLAYBACK ──────────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PLAYBACK — Play All (M3U) and single video
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Build an M3U playlist from all video items in the current folder
- * and hand it to MX Player via the Java bridge.
- * MX Player loads it as a native playlist — prev/next works exactly
- * like a local folder of files.
- */
+/** Play All — starts from episode 1 with full playlist. */
 function playAll() {
     const videos = state.items.filter(i => i.isVideo);
     if (!videos.length) return;
-
-    const lines = ['#EXTM3U'];
-    videos.forEach(v => {
-        lines.push(`#EXTINF:-1,${v.name}`);
-        lines.push(v.url);
-    });
-
-    const m3uContent = lines.join('\n');
-
     if (window.Android) {
-        window.Android.openPlaylist(m3uContent);
-    } else {
-        // Dev/browser fallback: trigger a download of the M3U
-        const blob = new Blob([m3uContent], { type: 'audio/x-mpegurl' });
-        const a    = document.createElement('a');
-        a.href     = URL.createObjectURL(blob);
-        a.download = 'playlist.m3u';
-        a.click();
+        window.Android.openVideoWithPlaylist(
+            JSON.stringify(videos.map(v => v.url)),
+            JSON.stringify(videos.map(v => v.name)),
+            0
+        );
     }
 }
 
-/** Same M3U, but just downloads the file (so the user can save/share it). */
-function downloadM3U() {
-    playAll(); // In the APK context both actions open the same M3U via MX Player.
-               // If you want a separate "save" action, handle it in the bridge.
+/** Shuffle — randomises order before handing to MX Player. */
+function shufflePlay() {
+    const videos = [...state.items.filter(i => i.isVideo)];
+    // Fisher-Yates shuffle
+    for (let i = videos.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [videos[i], videos[j]] = [videos[j], videos[i]];
+    }
+    if (!videos.length) return;
+    if (window.Android) {
+        window.Android.openVideoWithPlaylist(
+            JSON.stringify(videos.map(v => v.url)),
+            JSON.stringify(videos.map(v => v.name)),
+            0
+        );
+    }
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UI HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
 
 function setContent(html) {
     const el = document.getElementById('content');
@@ -711,43 +690,27 @@ function setContent(html) {
     el.scrollTop = 0;
 }
 
-function setHeader(title) {
+function setHeader(title, showSearch) {
     document.getElementById('hdrTitle').textContent =
-        title.length > 30 ? title.slice(0, 28) + '…' : title;
-
-    const backBtn = document.getElementById('backBtn');
-    backBtn.style.display = state.stack.length > 0 ? 'flex' : 'none';
+        title.length > 30 ? title.slice(0,28)+'…' : title;
+    document.getElementById('backBtn').style.display  = state.stack.length > 0 ? 'flex' : 'none';
+    document.getElementById('searchBtn').style.display = showSearch ? '' : 'none';
 }
 
 function setBreadcrumb(stack) {
     const el = document.getElementById('bread');
-
-    if (!stack.length) {
-        el.style.display = 'none';
-        el.innerHTML     = '';
-        return;
-    }
+    if (!stack.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
     el.style.display = 'flex';
-
-    // Build: Home › FolderA › FolderB › CurrentFolder
     let html = `<span class="crumb" onclick="showRoot()">Home</span>`;
     stack.forEach((entry, i) => {
         const isLast = i === stack.length - 1;
-        const label  = entry.title.length > 22
-            ? entry.title.slice(0, 20) + '…'
-            : entry.title;
-
+        const label  = entry.title.length > 22 ? entry.title.slice(0,20)+'…' : entry.title;
         html += `<span class="crumb-sep">›</span>`;
-        if (isLast) {
-            html += `<span class="crumb crumb-current">${esc(label)}</span>`;
-        } else {
-            html += `<span class="crumb" onclick="jumpToBreadcrumb(${i})">${esc(label)}</span>`;
-        }
+        if (isLast) html += `<span class="crumb crumb-current">${esc(label)}</span>`;
+        else html += `<span class="crumb" onclick="jumpToBreadcrumb(${i})">${esc(label)}</span>`;
     });
-
-    el.innerHTML = html;
-    // Auto-scroll to the end so the current folder is always visible
+    el.innerHTML  = html;
     el.scrollLeft = el.scrollWidth;
 }
 
@@ -755,41 +718,20 @@ function setActionBar(visible) {
     document.getElementById('actionBar').style.display = visible ? 'flex' : 'none';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// STRING ESCAPING
-// Safe escaping for HTML output and attribute values.
-// We NEVER embed raw URLs or filenames in onclick="" strings.
-// All interactivity uses index-based onclick (clickItem, browseRoot, etc.)
-// The only places we embed strings in markup are breadcrumb labels
-// and error messages, which go through esc() for HTML safety.
-// ─────────────────────────────────────────────────────────────────────────────
+// ── ESCAPING ──────────────────────────────────────────────────────────────────
 
-/** Escape a string for safe insertion as HTML text content. */
 function esc(s) {
     return String(s)
-        .replace(/&/g,  '&amp;')
-        .replace(/</g,  '&lt;')
-        .replace(/>/g,  '&gt;')
-        .replace(/"/g,  '&quot;')
-        .replace(/'/g,  '&#39;');
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-/**
- * Escape a string for safe use inside an HTML attribute value
- * that is already quoted with single quotes in a JS onclick handler.
- * (Used only in retry buttons where we embed a URL inline.)
- */
 function escAttr(s) {
     return String(s)
-        .replace(/\\/g, '\\\\')
-        .replace(/'/g,  "\\'")
-        .replace(/"/g,  '&quot;');
+        .replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
 }
 
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────────────────────────
 showRoot();
 </script>
 </body>
