@@ -20,6 +20,7 @@
     --accent:   #ff5722;
     --folder:   #ffa726;
     --video:    #42a5f5;
+    --watched:  #4caf50;
     --text:     #e0e0e0;
     --dim:      #737373;
     --radius:   10px;
@@ -125,12 +126,28 @@ body { display: flex; flex-direction: column; }
 /* ─── Action bar ─────────────────────────────────────────────────────────── */
 #actionBar {
     display: none;
+    flex-direction: column;
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 8px 12px;
+    padding: 10px 12px 8px;
     gap: 8px;
 }
+.progress-row { display: flex; align-items: center; gap: 8px; }
+.progress-text {
+    flex-shrink: 0;
+    font-size: 11px; color: var(--dim); white-space: nowrap;
+}
+.progress-track {
+    flex: 1; height: 4px; border-radius: 2px;
+    background: var(--border); overflow: hidden;
+}
+.progress-fill {
+    height: 100%; width: 0%; border-radius: 2px;
+    background: var(--watched);
+    transition: width .2s ease;
+}
+.action-btn-row { display: flex; gap: 8px; }
 .ab-btn {
     flex: 1; height: 38px;
     border: none; border-radius: 8px;
@@ -154,6 +171,43 @@ body { display: flex; flex-direction: column; }
 
 /* ─── Root cards ─────────────────────────────────────────────────────────── */
 .root-list { padding: 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+
+/* ─── Continue Browsing card ─────────────────────────────────────────────── */
+.continue-card {
+    position: relative;
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 40px 14px 14px;
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 14px; cursor: pointer;
+}
+.continue-card:active { background: var(--surface2); }
+.continue-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(255,87,34,.15); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+}
+.continue-info { flex: 1; min-width: 0; }
+.continue-label {
+    font-size: 10px; font-weight: 700; letter-spacing: .6px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 2px;
+}
+.continue-title {
+    font-size: 14.5px; font-weight: 600;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.continue-path {
+    font-size: 11px; color: var(--dim); margin-top: 2px;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.continue-dismiss {
+    position: absolute; top: 8px; right: 8px;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: none; color: var(--dim);
+    font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.continue-dismiss:active { background: var(--surface2); }
 .root-card {
     display: flex; align-items: center; gap: 14px;
     padding: 16px 14px;
@@ -187,9 +241,11 @@ body { display: flex; flex-direction: column; }
 }
 .fi-dir   { background: rgba(255,167,38,.12); color: var(--folder); }
 .fi-video { background: rgba( 66,165,245,.12); color: var(--video); }
+.fi-watched { background: rgba(76,175,80,.15); color: var(--watched); }
 .finfo { flex: 1; min-width: 0; }
 .fname { font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .fmeta { font-size: 11px; color: var(--dim); margin-top: 3px; }
+.watched-tag { color: var(--watched); }
 .farrow      { font-size: 18px; color: var(--border); flex-shrink: 0; }
 .farrow-play { color: var(--video); font-size: 14px; }
 
@@ -247,9 +303,15 @@ body { display: flex; flex-direction: column; }
 <div id="bread"></div>
 
 <!-- ── Action bar ─────────────────────────────────────────────────────── -->
-<div id="actionBar" style="display:none; flex-direction:row;">
-    <button class="ab-btn ab-fill"    onclick="playAll()">▶&nbsp; Play All</button>
-    <button class="ab-btn ab-outline" onclick="shufflePlay()">⇄&nbsp; Shuffle</button>
+<div id="actionBar" style="display:none;">
+    <div class="progress-row">
+        <span id="progressText" class="progress-text"></span>
+        <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+    </div>
+    <div class="action-btn-row">
+        <button class="ab-btn ab-fill"    onclick="playAll()">▶&nbsp; Play All</button>
+        <button class="ab-btn ab-outline" onclick="shufflePlay()">⇄&nbsp; Shuffle</button>
+    </div>
 </div>
 
 <!-- ── Content ────────────────────────────────────────────────────────── -->
@@ -274,13 +336,80 @@ const CONFIG = {
                 '.flv','.wmv','.m2ts','.mov','.rmvb']
 };
 
+// ── PERSISTENCE (localStorage) ────────────────────────────────────────────────
+const STORAGE_KEYS = {
+    WATCHED:     'cftp_watched_v1',
+    LAST_FOLDER: 'cftp_lastFolder_v1'
+};
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
 const state = {
     stack       : [],   // navigation history: [{url, title}]
     items       : [],   // full unfiltered items in current folder
     searchQuery : '',   // current search string
-    searchActive: false
+    searchActive: false,
+    watched     : loadWatchedMap()   // { videoUrl: timestampFirstWatched }
 };
+
+/**
+ * Watched-episode tracking. Stored as { videoUrl: timestamp } in localStorage
+ * so checkmarks and per-folder progress survive app restarts. This is a
+ * "tapped it / started it" marker, not real playback-position resume — that
+ * would require hooking into MX Player's (possibly modified) internals.
+ */
+function loadWatchedMap() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.WATCHED);
+        return raw ? JSON.parse(raw) : {};
+    } catch (_) { return {}; }
+}
+
+function persistWatchedMap() {
+    try { localStorage.setItem(STORAGE_KEYS.WATCHED, JSON.stringify(state.watched)); }
+    catch (_) { /* storage full/unavailable — fail silently, app still works */ }
+}
+
+function isWatched(url) {
+    return !!state.watched[url];
+}
+
+function markWatched(url) {
+    if (state.watched[url]) return;
+    state.watched[url] = Date.now();
+    persistWatchedMap();
+}
+
+function markManyWatched(urls) {
+    let changed = false;
+    urls.forEach(u => {
+        if (!state.watched[u]) { state.watched[u] = Date.now(); changed = true; }
+    });
+    if (changed) persistWatchedMap();
+}
+
+/**
+ * "Continue Browsing" — remembers the deepest folder the user navigated into,
+ * as the full breadcrumb chain (so jumping back in restores proper breadcrumbs,
+ * not just a flat URL). Updated every time browse() successfully loads a folder.
+ */
+function loadLastFolder() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.LAST_FOLDER);
+        return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+}
+
+function saveLastFolder(stack) {
+    try {
+        const trimmed = stack.map(s => ({ url: s.url, title: s.title }));
+        localStorage.setItem(STORAGE_KEYS.LAST_FOLDER, JSON.stringify(trimmed));
+    } catch (_) { /* ignore */ }
+}
+
+function clearLastFolder() {
+    try { localStorage.removeItem(STORAGE_KEYS.LAST_FOLDER); }
+    catch (_) { /* ignore */ }
+}
 
 // ── PARSING ───────────────────────────────────────────────────────────────────
 
@@ -389,32 +518,44 @@ function formatSize(raw) {
 // ── SEARCH ────────────────────────────────────────────────────────────────────
 
 /**
- * Fuzzy word search: splits query by spaces, every word must appear
- * somewhere in the name (case-insensitive). Handles:
+ * Fuzzy word search: every word must appear somewhere in the name
+ * (case-insensitive). Handles:
  *   "attack titan"  → Attack on Titan ✓
  *   "one piece"     → One Piece ✓
  *   "naruto shipp"  → Naruto Shippuden ✓
+ *
+ * Accepts a pre-split, lowercased `words` array (built once per render
+ * pass by renderItems) instead of re-splitting the query string for
+ * every single item being filtered.
  */
-function matchesSearch(name, query) {
-    if (!query.trim()) return true;
-    const lName  = name.toLowerCase();
-    const words  = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+function matchesWords(name, words) {
+    if (!words.length) return true;
+    const lName = name.toLowerCase();
     return words.every(w => lName.includes(w));
+}
+
+/**
+ * Build a single compiled regex for the current query, reused across all
+ * items in a render pass instead of recompiling per item (that recompilation
+ * on every keystroke across a large list was part of the search lag).
+ */
+function buildHighlightRegex(query) {
+    const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return null;
+    return new RegExp(
+        '(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')',
+        'gi'
+    );
 }
 
 /**
  * Highlight matching words in a name string for display.
  * Returns safe HTML with <span class="match"> around matched segments.
+ * `regex` should come from buildHighlightRegex(), built once per render pass.
  */
-function highlightName(name, query) {
-    if (!query.trim()) return esc(name);
-    const words = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
-    // Build a regex that matches any of the words (case-insensitive)
-    const pattern = new RegExp(
-        '(' + words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|') + ')',
-        'gi'
-    );
-    return esc(name).replace(pattern, '<span class="match">$1</span>');
+function highlightName(name, regex) {
+    if (!regex) return esc(name);
+    return esc(name).replace(regex, '<span class="match">$1</span>');
 }
 
 function toggleSearch() {
@@ -460,12 +601,19 @@ function clearSearch() {
     document.getElementById('searchInput').focus();
 }
 
+let searchDebounceTimer = null;
+
 function onSearchInput(val) {
     state.searchQuery = val;
     const clearBtn = document.getElementById('searchClear');
     if (val.length > 0) clearBtn.classList.add('visible');
     else                clearBtn.classList.remove('visible');
-    renderCurrentItems();
+
+    // Debounce: the full list re-render (filter + highlight regex + DOM rebuild)
+    // is too heavy to run on every single keystroke without making typing feel
+    // laggy. Wait for a short pause in typing before re-rendering.
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(renderCurrentItems, 120);
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
@@ -478,7 +626,7 @@ function showRoot() {
 
     setHeader('CircleFTP Browser', false);
     setBreadcrumb([]);
-    setActionBar(false);
+    setActionBar([]);
 
     const cards = CONFIG.roots.map((r,i) => `
         <div class="root-card" onclick="browseRoot(${i})">
@@ -490,7 +638,43 @@ function showRoot() {
             <div class="farrow">›</div>
         </div>`).join('');
 
-    setContent(`<div class="root-list">${cards}</div>`);
+    setContent(`<div class="root-list">${buildContinueCard()}${cards}</div>`);
+}
+
+/** Builds the "Continue Browsing" card HTML, or '' if nothing saved. */
+function buildContinueCard() {
+    const last = loadLastFolder();
+    if (!last || !last.length) return '';
+
+    const deepest   = last[last.length - 1];
+    const pathLabel = last.map(s => s.title).join(' › ');
+    const safePath  = pathLabel.length > 60 ? '…' + pathLabel.slice(-58) : pathLabel;
+
+    return `
+    <div class="continue-card" onclick="continueBrowsing()">
+        <div class="continue-icon">⏵</div>
+        <div class="continue-info">
+            <div class="continue-label">Continue Browsing</div>
+            <div class="continue-title">${esc(deepest.title)}</div>
+            <div class="continue-path">${esc(safePath)}</div>
+        </div>
+        <button class="continue-dismiss"
+            onclick="event.stopPropagation(); dismissContinue();">✕</button>
+    </div>`;
+}
+
+/** Jumps straight back into the last-browsed folder, breadcrumbs intact. */
+function continueBrowsing() {
+    const last = loadLastFolder();
+    if (!last || !last.length) return;
+    const deepest = last[last.length - 1];
+    state.stack   = last.slice(0, -1);
+    browse(deepest.url, deepest.title);
+}
+
+function dismissContinue() {
+    clearLastFolder();
+    showRoot();
 }
 
 function browseRoot(idx) {
@@ -506,13 +690,14 @@ async function browse(url, title) {
     state.stack.push({ url, title });
     setHeader(title, true);
     setBreadcrumb(state.stack);
-    setActionBar(false);
+    setActionBar([]);
     setContent(`<div class="state-center"><div class="spinner"></div><span>Loading…</span></div>`);
 
     try {
         const items  = await fetchDirectory(url);
         state.items  = items;
         renderCurrentItems();
+        saveLastFolder(state.stack);
     } catch (err) {
         state.stack.pop();
         setBreadcrumb(state.stack);
@@ -535,15 +720,20 @@ function renderCurrentItems() {
 }
 
 function renderItems(allItems, query) {
+    // Precompute once per render pass (not per item) — this is the
+    // expensive part that was being repeated for every single item
+    // on every keystroke.
+    const queryWords = query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const hlRegex     = buildHighlightRegex(query);
+
     // Pair each item with its original index in state.items
     // so clickItem() can always reference the full unfiltered array.
     const filtered = allItems
         .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => matchesSearch(item.name, query));
+        .filter(({ item }) => matchesWords(item.name, queryWords));
 
     // Action bar: show when the FULL folder has videos (not filtered count)
-    const hasVideo = allItems.some(i => i.isVideo);
-    setActionBar(hasVideo);
+    setActionBar(allItems);
 
     if (!filtered.length) {
         const msg = query.trim()
@@ -559,20 +749,21 @@ function renderItems(allItems, query) {
             <div class="fitem" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
-                    <div class="fname">${highlightName(item.name, query)}</div>
+                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
                     <div class="fmeta">Folder</div>
                 </div>
                 <div class="farrow">›</div>
             </div>`;
         }
         if (item.isVideo) {
+            const watched = isWatched(item.url);
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
             return `
             <div class="fitem" onclick="clickItem(${idx})">
-                <div class="ficon fi-video">▶</div>
+                <div class="ficon fi-video${watched ? ' fi-watched' : ''}">${watched ? '✓' : '▶'}</div>
                 <div class="finfo">
-                    <div class="fname">${highlightName(item.name, query)}</div>
-                    <div class="fmeta">${meta}</div>
+                    <div class="fname">${highlightName(item.name, hlRegex)}</div>
+                    <div class="fmeta">${meta}${watched ? ' · <span class="watched-tag">Watched</span>' : ''}</div>
                 </div>
                 <div class="farrow farrow-play">▶</div>
             </div>`;
@@ -610,6 +801,9 @@ function clickItem(idx) {
         // Build full ordered video list from the unfiltered state.items
         const allVideos = state.items.filter(i => i.isVideo);
         const startAt   = allVideos.findIndex(v => v.url === item.url);
+
+        markWatched(item.url);
+        renderCurrentItems();
 
         if (window.Android) {
             window.Android.openVideoWithPlaylist(
@@ -655,6 +849,8 @@ function jumpToBreadcrumb(idx) {
 function playAll() {
     const videos = state.items.filter(i => i.isVideo);
     if (!videos.length) return;
+    markManyWatched(videos.map(v => v.url));
+    renderCurrentItems();
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
             JSON.stringify(videos.map(v => v.url)),
@@ -667,12 +863,14 @@ function playAll() {
 /** Shuffle — randomises order before handing to MX Player. */
 function shufflePlay() {
     const videos = [...state.items.filter(i => i.isVideo)];
+    if (!videos.length) return;
     // Fisher-Yates shuffle
     for (let i = videos.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [videos[i], videos[j]] = [videos[j], videos[i]];
     }
-    if (!videos.length) return;
+    markManyWatched(videos.map(v => v.url));
+    renderCurrentItems();
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
             JSON.stringify(videos.map(v => v.url)),
@@ -714,8 +912,28 @@ function setBreadcrumb(stack) {
     el.scrollLeft = el.scrollWidth;
 }
 
-function setActionBar(visible) {
-    document.getElementById('actionBar').style.display = visible ? 'flex' : 'none';
+/**
+ * Shows/hides the action bar (Play All / Shuffle + progress row).
+ * Accepts the FULL unfiltered items array for the current folder
+ * (or [] / false to hide) — computes video count + watched count from it.
+ */
+function setActionBar(items) {
+    const el = document.getElementById('actionBar');
+    const videos = Array.isArray(items) ? items.filter(i => i.isVideo) : [];
+
+    if (!videos.length) {
+        el.style.display = 'none';
+        return;
+    }
+
+    const watchedCount = videos.filter(v => isWatched(v.url)).length;
+    const pct = Math.round((watchedCount / videos.length) * 100);
+
+    document.getElementById('progressText').textContent =
+        `${watchedCount} / ${videos.length} episode${videos.length === 1 ? '' : 's'} watched`;
+    document.getElementById('progressFill').style.width = pct + '%';
+
+    el.style.display = 'flex';
 }
 
 // ── ESCAPING ──────────────────────────────────────────────────────────────────
