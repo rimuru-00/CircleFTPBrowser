@@ -6,50 +6,25 @@
       maximum-scale=1.0, user-scalable=no">
 <title>CircleFTP</title>
 <style>
-/* ─── Reset & tokens ──────────────────────────────────────────────────── */
+/* ─── Reset & tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
     margin: 0; padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
 }
 :root {
-    /* Background layers */
-    --bg:         #08080f;
-    --surface:    #0f0f1c;
-    --surface2:   #171729;
-    --surface3:   #1f1f38;
-
-    /* Borders */
-    --border:     #242440;
-    --border2:    #32325c;
-
-    /* Accent – violet / purple gradient */
-    --accent:     #8b5cf6;
-    --accent-hi:  #c4b5fd;
-    --accent-lo:  rgba(139,92,246,.13);
-    --grad:       linear-gradient(135deg,#7c3aed,#a855f7);
-    --grad-glow:  rgba(124,58,237,.28);
-
-    /* Status colours */
-    --folder:     #fbbf24;
-    --folder-lo:  rgba(251,191,36,.10);
-    --video:      #38bdf8;
-    --video-lo:   rgba(56,189,248,.10);
-    --watched:    #4ade80;
-    --watched-lo: rgba(74,222,128,.10);
-    --inprog:     #fb923c;
-    --inprog-lo:  rgba(251,146,60,.10);
-
-    /* Text */
-    --text:  #e4e2f8;
-    --text2: #9896c0;
-    --dim:   #545478;
-
-    /* Shape */
-    --r:    12px;
-    --rl:   16px;
+    --bg:       #0d0d0d;
+    --surface:  #161616;
+    --surface2: #1f1f1f;
+    --border:   #282828;
+    --accent:   #ff5722;
+    --folder:   #ffa726;
+    --video:    #42a5f5;
+    --watched:  #4caf50;
+    --text:     #e0e0e0;
+    --dim:      #737373;
+    --radius:   10px;
 }
-
 html, body {
     height: 100%;
     overflow: hidden;
@@ -61,57 +36,57 @@ html, body {
 }
 body { display: flex; flex-direction: column; }
 
-/* ─── Header ──────────────────────────────────────────────────────────── */
+/* ─── Header ─────────────────────────────────────────────────────────────── */
 #header {
     flex-shrink: 0;
-    height: 58px;
-    background: rgba(8,8,15,.90);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    height: 56px;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    padding: 0 10px 0 6px;
+    padding: 0 8px 0 4px;
     gap: 4px;
     z-index: 20;
 }
 .hdr-icon-btn {
     width: 44px; height: 44px;
     border: none; background: none;
-    color: var(--text2);
-    font-size: 22px; line-height: 1;
+    color: var(--text);
+    font-size: 24px; line-height: 1;
     border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
 }
-.hdr-icon-btn:active { background: var(--surface2); color: var(--text); }
-
+.hdr-icon-btn:active { background: var(--surface2); }
 #hdrTitle {
     flex: 1;
-    font-size: 17px; font-weight: 600; letter-spacing: -.3px;
+    font-size: 17px; font-weight: 500;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .hdr-badge {
     flex-shrink: 0;
-    background: var(--grad); color: #fff;
-    font-size: 9px; font-weight: 800; letter-spacing: 1.2px;
-    text-transform: uppercase;
-    padding: 4px 10px; border-radius: 20px;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    padding: 3px 8px; border-radius: 12px;
 }
 
-/* ─── Search ──────────────────────────────────────────────────────────── */
+/* ─── Search input (replaces title in header) ────────────────────────────── */
 #searchWrap {
     flex: 1;
-    display: none;
+    display: none; /* shown when search is active */
     align-items: center;
     background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 24px;
+    border: 1px solid var(--border);
+    border-radius: 22px;
     padding: 0 12px;
     height: 38px;
     gap: 8px;
+    transform-origin: right center;
 }
-#searchWrap.active { display: flex; }
+#searchWrap.active {
+    display: flex;
+    animation: searchSpring 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
 #searchInput {
     flex: 1;
     background: none; border: none; outline: none;
@@ -123,18 +98,19 @@ body { display: flex; flex-direction: column; }
 #searchClear {
     background: none; border: none;
     color: var(--dim); font-size: 18px;
-    cursor: pointer; padding: 0; display: none;
+    cursor: pointer; padding: 0;
+    display: none;
 }
 #searchClear.visible { display: block; }
 
-/* ─── Breadcrumb ──────────────────────────────────────────────────────── */
+/* ─── Breadcrumb ─────────────────────────────────────────────────────────── */
 #bread {
     display: none;
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 0 14px;
-    height: 32px;
+    padding: 0 12px;
+    height: 34px;
     align-items: center;
     gap: 2px;
     overflow-x: auto;
@@ -143,115 +119,86 @@ body { display: flex; flex-direction: column; }
 }
 #bread::-webkit-scrollbar { display: none; }
 .crumb {
-    font-size: 11.5px; color: var(--dim);
-    padding: 3px 6px; border-radius: 6px;
+    font-size: 12px; color: var(--dim);
+    padding: 4px 5px; border-radius: 4px;
     cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
-.crumb:not(.crumb-current):active { background: var(--surface2); color: var(--text2); }
-.crumb-current { color: var(--text2); cursor: default; font-weight: 500; }
-.crumb-sep { font-size: 11px; color: var(--border2); flex-shrink: 0; padding: 0 2px; }
+.crumb:not(.crumb-current):active { background: var(--surface2); }
+.crumb-current { color: var(--text); cursor: default; }
+.crumb-sep { font-size: 12px; color: var(--border); flex-shrink: 0; }
 
-/* ─── Action bar ──────────────────────────────────────────────────────── */
+/* ─── Action bar ─────────────────────────────────────────────────────────── */
 #actionBar {
     display: none;
     flex-direction: column;
     flex-shrink: 0;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 10px 14px 12px;
-    gap: 10px;
+    padding: 10px 12px 8px;
+    gap: 8px;
 }
-.progress-row { display: flex; align-items: center; gap: 10px; }
+.progress-row { display: flex; align-items: center; gap: 8px; }
 .progress-text {
     flex-shrink: 0;
-    font-size: 11px; color: var(--dim); white-space: nowrap; font-weight: 500;
+    font-size: 11px; color: var(--dim); white-space: nowrap;
 }
 .progress-track {
-    flex: 1; height: 3px; border-radius: 2px;
+    flex: 1; height: 4px; border-radius: 2px;
     background: var(--border); overflow: hidden;
 }
 .progress-fill {
     height: 100%; width: 0%; border-radius: 2px;
-    background: var(--grad);
-    transition: width .3s ease;
+    background: var(--watched);
+    transition: width .2s ease;
 }
-.action-btn-row { display: flex; gap: 10px; }
+.action-btn-row { display: flex; gap: 8px; }
 .ab-btn {
-    flex: 1; height: 42px;
-    border: none; border-radius: var(--r);
-    font-size: 13.5px; font-weight: 700;
+    flex: 1; height: 38px;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 600;
     cursor: pointer;
     display: inline-flex; align-items: center;
-    justify-content: center; gap: 7px;
-    letter-spacing: .1px;
+    justify-content: center; gap: 6px;
 }
-.ab-btn:active { opacity: .75; }
-.ab-fill {
-    background: var(--grad); color: #fff;
-    box-shadow: 0 4px 18px var(--grad-glow);
-}
-.ab-outline {
-    background: var(--surface2);
-    color: var(--text2);
-    border: 1px solid var(--border2);
-}
+.ab-btn:active { opacity: 0.75; }
+.ab-fill    { background: var(--accent); color: #fff; }
+.ab-outline { background: transparent; color: var(--dim); border: 1px solid var(--border); }
 
-/* ─── Content ─────────────────────────────────────────────────────────── */
-#content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* ─── Scroll content ─────────────────────────────────────────────────────── */
+#content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
 #content::-webkit-scrollbar { width: 2px; }
 #content::-webkit-scrollbar-thumb { background: var(--border); }
 
-/* ─── Root list ───────────────────────────────────────────────────────── */
-.root-list { padding: 0 14px 24px; display: flex; flex-direction: column; gap: 12px; }
+/* ─── Root cards ─────────────────────────────────────────────────────────── */
+.root-list { padding: 16px 12px; display: flex; flex-direction: column; gap: 10px; }
 
-/* ─── Home hero ───────────────────────────────────────────────────────── */
-.home-hero {
-    text-align: center;
-    padding: 28px 16px 16px;
-}
-.home-hero-icon {
-    font-size: 52px; line-height: 1; margin-bottom: 12px;
-    display: block;
-    filter: drop-shadow(0 0 20px rgba(139,92,246,.55));
-}
-.home-hero-title {
-    font-size: 28px; font-weight: 800; letter-spacing: -.6px;
-    background: var(--grad);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 4px; line-height: 1.1;
-}
-.home-hero-sub {
-    font-size: 12px; color: var(--dim);
-    letter-spacing: .6px; text-transform: uppercase; font-weight: 600;
-}
-
-/* ─── Continue card ───────────────────────────────────────────────────── */
+/* ─── Continue Browsing card ─────────────────────────────────────────────── */
 .continue-card {
     position: relative;
     display: flex; align-items: center; gap: 14px;
-    padding: 16px 44px 16px 16px;
-    background: linear-gradient(135deg,
-        rgba(124,58,237,.11) 0%,
-        rgba(168,85,247,.05) 100%);
-    border: 1px solid rgba(139,92,246,.30);
-    border-radius: var(--rl); cursor: pointer;
+    padding: 14px 40px 14px 14px;
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 14px; cursor: pointer;
+    animation: fadeUp 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.continue-card:active { background: rgba(139,92,246,.18); }
+.continue-card:active { background: var(--surface2); }
 .continue-icon {
-    width: 46px; height: 46px; border-radius: 14px;
-    background: var(--grad); color: #fff;
+    width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(255,87,34,.15); color: var(--accent);
     display: flex; align-items: center; justify-content: center;
     font-size: 20px; flex-shrink: 0;
-    box-shadow: 0 4px 14px var(--grad-glow);
 }
 .continue-info { flex: 1; min-width: 0; }
 .continue-label {
-    font-size: 9.5px; font-weight: 800; letter-spacing: 1px;
-    color: var(--accent-hi); text-transform: uppercase; margin-bottom: 3px;
+    font-size: 10px; font-weight: 700; letter-spacing: .6px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 2px;
 }
 .continue-title {
-    font-size: 15px; font-weight: 700;
+    font-size: 14.5px; font-weight: 600;
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .continue-path {
@@ -259,130 +206,165 @@ body { display: flex; flex-direction: column; }
     overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
 }
 .continue-dismiss {
-    position: absolute; top: 10px; right: 10px;
-    width: 26px; height: 26px; border-radius: 50%;
-    border: none; background: rgba(255,255,255,.06); color: var(--dim);
-    font-size: 13px; cursor: pointer;
+    position: absolute; top: 8px; right: 8px;
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: none; color: var(--dim);
+    font-size: 15px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
 }
-.continue-dismiss:active { background: var(--surface3); }
-
-/* ─── Root card ───────────────────────────────────────────────────────── */
+.continue-dismiss:active { background: var(--surface2); }
 .root-card {
-    display: flex; align-items: center; gap: 16px;
-    padding: 18px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rl); cursor: pointer;
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; cursor: pointer;
+    animation: fadeUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.root-card:active { background: var(--surface2); border-color: var(--border2); }
+.root-card:active { background: var(--surface2); }
 .root-icon {
-    width: 52px; height: 52px; border-radius: 14px;
-    background: var(--accent-lo);
+    width: 50px; height: 50px; border-radius: 12px;
+    background: rgba(255,87,34,.12);
     display: flex; align-items: center; justify-content: center;
-    font-size: 26px; flex-shrink: 0;
+    font-size: 24px; flex-shrink: 0;
 }
 .root-info { flex: 1; min-width: 0; }
-.root-name { font-size: 15.5px; font-weight: 700; letter-spacing: -.2px; }
-.root-desc { font-size: 11.5px; color: var(--dim); margin-top: 4px;
+.root-name { font-size: 15px; font-weight: 600; }
+.root-desc { font-size: 11px; color: var(--dim); margin-top: 3px;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.root-card .farrow { font-size: 20px; color: var(--dim); }
 
-/* ─── File list ───────────────────────────────────────────────────────── */
+/* ─── File / folder list ─────────────────────────────────────────────────── */
 .fitem {
-    display: flex; align-items: center; gap: 14px;
-    padding: 0 14px; min-height: 66px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 12px; height: 64px;
     border-bottom: 1px solid var(--border);
     cursor: pointer;
+    animation: slideInX 0.2s ease both;
 }
 .fitem:active { background: var(--surface2); }
-.fi-other { opacity: .35; pointer-events: none; }
-
 .ficon {
-    width: 44px; height: 44px; border-radius: var(--r);
+    width: 42px; height: 42px; border-radius: var(--radius);
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; flex-shrink: 0; font-weight: 700;
+    font-size: 20px; flex-shrink: 0;
 }
-.fi-dir      { background: var(--folder-lo); color: var(--folder); }
-.fi-video    { background: var(--video-lo);  color: var(--video);  }
-.fi-watched  { background: var(--watched-lo);color: var(--watched);}
-.fi-progress { background: var(--inprog-lo); color: var(--inprog); }
-.fi-file     { background: rgba(84,84,120,.10); color: var(--dim); }
-
+.fi-dir   { background: rgba(255,167,38,.12); color: var(--folder); }
+.fi-video { background: rgba( 66,165,245,.12); color: var(--video); }
+.fi-watched { background: rgba(76,175,80,.15); color: var(--watched); }
+.fi-progress { background: rgba(255,167,38,.15); color: var(--folder); }
 .finfo { flex: 1; min-width: 0; }
-.fname {
-    font-size: 13.5px; font-weight: 500;
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    line-height: 1.3;
-}
+.fname { font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .fmeta { font-size: 11px; color: var(--dim); margin-top: 3px; }
-.watched-tag  { color: var(--watched); font-weight: 600; }
-.progress-tag { color: var(--inprog);  font-weight: 600; }
-
-.farrow      { font-size: 18px; color: var(--border2); flex-shrink: 0; }
-.farrow-play { color: var(--accent-hi); font-size: 13px; opacity: .75; }
+.watched-tag  { color: var(--watched); }
+.progress-tag { color: var(--folder); }
+.farrow      { font-size: 18px; color: var(--border); flex-shrink: 0; }
+.farrow-play { color: var(--video); font-size: 14px; }
 
 /* highlight matched search chars */
-.match { color: var(--accent-hi); font-weight: 700; }
+.match { color: var(--accent); font-weight: 600; }
 
-/* ─── States ──────────────────────────────────────────────────────────── */
+/* ─── States ─────────────────────────────────────────────────────────────── */
 .state-center {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    min-height: 240px; gap: 12px;
+    min-height: 220px; gap: 14px;
     color: var(--dim); font-size: 14px;
-    text-align: center; padding: 28px;
+    text-align: center; padding: 24px;
 }
 .spinner {
-    width: 34px; height: 34px;
-    border: 2.5px solid var(--border);
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
     border-top-color: var(--accent);
     border-radius: 50%;
-    animation: spin .65s linear infinite;
+    animation: spin .75s linear infinite, popIn 0.3s ease both;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.retry-btn {
-    margin-top: 8px; padding: 9px 22px;
-    border: 1px solid var(--border); border-radius: 10px;
-    background: var(--surface2); color: var(--text2);
-    font-size: 13px; cursor: pointer; font-weight: 500;
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .spinner { animation: spin .75s linear infinite; }
 }
-.retry-btn:active { background: var(--surface3); }
-.err-msg { font-size: 12px; color: var(--dim); word-break: break-word; max-width: 260px; }
-.no-results { font-size: 32px; margin-bottom: 4px; }
+.retry-btn {
+    margin-top: 8px; padding: 8px 20px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: none; color: var(--text);
+    font-size: 13px; cursor: pointer;
+}
+.retry-btn:active { background: var(--surface2); }
+.err-msg { font-size: 12px; color: var(--dim); word-break: break-word; }
 
-/* ─── Tab bar ─────────────────────────────────────────────────────────── */
+/* search empty state */
+.no-results { font-size: 28px; margin-bottom: 4px; }
+
+/* ─── Keyframes ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideInX {
+    from { opacity: 0; transform: translateX(-12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.65); }
+    to   { opacity: 1; transform: scale(1); }
+}
+@keyframes searchSpring {
+    from { opacity: 0; transform: scaleX(0.82) scaleY(0.88); }
+    to   { opacity: 1; transform: scaleX(1) scaleY(1); }
+}
+@keyframes cFade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes hdrBadgePop {
+    0%   { transform: scale(0.7); opacity: 0; }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1);   opacity: 1; }
+}
+@keyframes tabDot {
+    0%   { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+
+/* ─── Animation applications ─────────────────────────────────────────────── */
+
+/* Content area fades in on every navigate */
+#content.c-anim { animation: cFade 0.22s ease both; }
+
+/* History view fades in when tab switches */
+#historyView.h-anim { animation: cFade 0.22s ease both; }
+
+/* Tab Bar ─────────────────────────────────────────────────────────────────── */
+/* ─── Tab Bar ─────────────────────────────────────────────────────────────── */
 #tabBar {
     flex-shrink: 0;
-    height: 60px;
-    background: rgba(8,8,15,.92);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+    height: 54px;
+    background: var(--surface);
     border-top: 1px solid var(--border);
     display: flex;
-    align-items: center;
-    padding: 6px 12px;
-    gap: 6px;
     z-index: 20;
 }
 .tab-btn {
     flex: 1;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 4px;
+    gap: 3px;
     border: none; background: none;
     color: var(--dim);
-    font-size: 22px; cursor: pointer;
-    padding: 8px 0; border-radius: var(--r);
+    font-size: 20px; cursor: pointer;
+    padding: 6px 0;
+    transition: color 0.18s ease, transform 0.12s ease;
 }
 .tab-btn span {
-    font-size: 10px; font-weight: 700; letter-spacing: .5px;
+    font-size: 10px; font-weight: 600; letter-spacing: .5px;
     text-transform: uppercase;
 }
-.tab-btn:active { background: var(--surface2); }
-.tab-active { color: var(--accent-hi) !important; background: var(--accent-lo) !important; }
+.tab-btn:active { background: var(--surface2); transform: scale(0.88); }
+.tab-active { color: var(--accent) !important; }
 
-/* ─── History ─────────────────────────────────────────────────────────── */
+/* ─── History View ───────────────────────────────────────────────────────── */
 #historyView {
     flex: 1;
     overflow-y: auto;
@@ -391,32 +373,19 @@ body { display: flex; flex-direction: column; }
 }
 #historyView::-webkit-scrollbar { width: 2px; }
 #historyView::-webkit-scrollbar-thumb { background: var(--border); }
-
 .hist-section-title {
-    font-size: 11px; font-weight: 800;
-    letter-spacing: .9px; color: var(--dim);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .8px; color: var(--dim);
     text-transform: uppercase;
 }
-.hist-header {
-    display: flex; align-items: center;
-    padding: 16px 14px 8px;
-}
-.hist-clear-btn {
-    margin-left: auto;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: var(--surface2); color: var(--text2);
-    font-size: 11px; font-weight: 600;
-    cursor: pointer; padding: 5px 12px;
-}
-.hist-clear-btn:active { background: var(--surface3); }
 </style>
 </head>
 <body>
 
-<!-- ── Header ────────────────────────────────────────────────────────── -->
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
 <div id="header">
     <button id="backBtn"   class="hdr-icon-btn" style="display:none" onclick="goBack()">‹</button>
-    <div    id="hdrTitle">CircleFTP</div>
+    <div    id="hdrTitle">CircleFTP Browser</div>
     <!-- search input — hidden until searchBtn tapped -->
     <div id="searchWrap">
         <span style="color:var(--dim);font-size:16px">⌕</span>
@@ -429,10 +398,10 @@ body { display: flex; flex-direction: column; }
     <div    id="hdrBadge"  class="hdr-badge">FTP</div>
 </div>
 
-<!-- ── Breadcrumb ────────────────────────────────────────────────────── -->
+<!-- ── Breadcrumb ─────────────────────────────────────────────────────── -->
 <div id="bread"></div>
 
-<!-- ── Action bar ────────────────────────────────────────────────────── -->
+<!-- ── Action bar ─────────────────────────────────────────────────────── -->
 <div id="actionBar" style="display:none;">
     <div class="progress-row">
         <span id="progressText" class="progress-text"></span>
@@ -444,13 +413,13 @@ body { display: flex; flex-direction: column; }
     </div>
 </div>
 
-<!-- ── Content ───────────────────────────────────────────────────────── -->
+<!-- ── Content ────────────────────────────────────────────────────────── -->
 <div id="content"></div>
 
-<!-- ── History view ──────────────────────────────────────────────────── -->
+<!-- ── History view ───────────────────────────────────────────────────── -->
 <div id="historyView"></div>
 
-<!-- ── Tab bar ───────────────────────────────────────────────────────── -->
+<!-- ── Tab bar ────────────────────────────────────────────────────────── -->
 <div id="tabBar">
     <button id="tabBrowse"  class="tab-btn tab-active" onclick="showTab('browse')">📂<span>Browse</span></button>
     <button id="tabHistory" class="tab-btn"            onclick="showTab('history')">🕒<span>History</span></button>
@@ -869,12 +838,12 @@ function showRoot() {
     state.stack = [];
     state.items = [];
 
-    setHeader('CircleFTP', false);
+    setHeader('CircleFTP Browser', false);
     setBreadcrumb([]);
     setActionBar([]);
 
     const cards = CONFIG.roots.map((r,i) => `
-        <div class="root-card" onclick="browseRoot(${i})">
+        <div class="root-card" style="animation-delay:${80 + i * 50}ms" onclick="browseRoot(${i})">
             <div class="root-icon">${r.icon}</div>
             <div class="root-info">
                 <div class="root-name">${esc(r.name)}</div>
@@ -883,14 +852,7 @@ function showRoot() {
             <div class="farrow">›</div>
         </div>`).join('');
 
-    setContent(`<div class="root-list">
-        <div class="home-hero">
-            <span class="home-hero-icon">🎌</span>
-            <div class="home-hero-title">CircleFTP</div>
-            <div class="home-hero-sub">Browse · Stream · Track</div>
-        </div>
-        ${buildContinueCard()}${cards}
-    </div>`);
+    setContent(`<div class="root-list">${buildContinueCard()}${cards}</div>`);
 }
 
 /** Builds the "Continue Browsing" card HTML, or '' if nothing saved. */
@@ -995,10 +957,11 @@ function renderItems(allItems, query) {
         return;
     }
 
-    const rows = filtered.map(({ item, idx }) => {
+    const rows = filtered.map(({ item, idx }, i) => {
+        const delay = `animation-delay:${Math.min(i * 22, 220)}ms`;
         if (item.isDir) {
             return `
-            <div class="fitem" onclick="clickItem(${idx})">
+            <div class="fitem" style="${delay}" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
                     <div class="fname">${highlightName(item.name, hlRegex)}</div>
@@ -1027,7 +990,7 @@ function renderItems(allItems, query) {
 
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
             return `
-            <div class="fitem" onclick="clickItem(${idx})">
+            <div class="fitem" style="${delay}" onclick="clickItem(${idx})">
                 <div class="ficon ${iconClass}">${iconGlyph}</div>
                 <div class="finfo">
                     <div class="fname">${highlightName(item.name, hlRegex)}</div>
@@ -1038,8 +1001,8 @@ function renderItems(allItems, query) {
         }
         // Non-video file (subs, nfo…)
         return `
-            <div class="fitem fi-other">
-                <div class="ficon fi-file">📄</div>
+            <div class="fitem" style="${delay};opacity:.4;cursor:default">
+                <div class="ficon" style="background:rgba(115,115,115,.1);color:var(--dim)">📄</div>
                 <div class="finfo">
                     <div class="fname">${esc(item.name)}</div>
                     <div class="fmeta">${esc(item.size||'File')}</div>
@@ -1192,6 +1155,9 @@ function setContent(html) {
     const el = document.getElementById('content');
     el.innerHTML = html;
     el.scrollTop = 0;
+    el.classList.remove('c-anim');
+    void el.offsetHeight; // force reflow so animation replays
+    el.classList.add('c-anim');
 }
 
 function setHeader(title, showSearch) {
@@ -1219,7 +1185,7 @@ function setBreadcrumb(stack) {
 }
 
 /**
- * Shows/hides the action bar (Play All / Resume + progress row).
+ * Shows/hides the action bar (Play All / Shuffle + progress row).
  * Accepts the FULL unfiltered items array for the current folder
  * (or [] / false to hide) — computes completed/in-progress counts from it.
  */
@@ -1331,7 +1297,8 @@ function renderHistory() {
         return;
     }
 
-    const rows = history.map(entry => {
+    const rows = history.map((entry, i) => {
+        const delay = Math.min(i * 22, 220);
         const rec        = watchRecord(entry.url);
         const completed  = !!(rec && rec.completed);
         const percent    = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
@@ -1349,7 +1316,7 @@ function renderHistory() {
             tagHtml   = ' · <span class="progress-tag">' + percent + '% watched</span>';
         }
 
-        return `<div class="fitem" onclick="playHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
+        return `<div class="fitem" style="animation-delay:${delay}ms" onclick="playHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
             <div class="ficon ${iconClass}">${iconGlyph}</div>
             <div class="finfo">
                 <div class="fname">${esc(entry.name)}</div>
@@ -1360,9 +1327,11 @@ function renderHistory() {
     }).join('');
 
     el.innerHTML = `
-        <div class="hist-header">
+        <div style="display:flex;align-items:center;padding:14px 12px 6px;">
             <span class="hist-section-title">Recently Watched</span>
-            <button class="hist-clear-btn" onclick="clearHistory()">Clear</button>
+            <button onclick="clearHistory()" style="margin-left:auto;border:1px solid var(--border);
+                background:none;color:var(--dim);font-size:11px;cursor:pointer;
+                padding:4px 10px;border-radius:6px;">Clear</button>
         </div>
         <div>${rows}</div>`;
 }
@@ -1396,15 +1365,23 @@ function showTab(tab) {
     const isBrowse  = tab === 'browse';
 
     document.getElementById('content').style.display     = isBrowse ? '' : 'none';
-    document.getElementById('historyView').style.display = isBrowse ? 'none' : '';
+    document.getElementById('historyView').style.display = isBrowse ? 'none' : 'block';
     document.getElementById('tabBrowse').classList.toggle('tab-active',  isBrowse);
     document.getElementById('tabHistory').classList.toggle('tab-active', !isBrowse);
+
+    if (!isBrowse) {
+        // replay fade animation on history view
+        const hv = document.getElementById('historyView');
+        hv.classList.remove('h-anim');
+        void hv.offsetHeight;
+        hv.classList.add('h-anim');
+    }
 
     if (isBrowse) {
         document.getElementById('hdrBadge').style.display = '';
         const inFolder = state.stack.length > 0;
         setHeader(
-            inFolder ? state.stack[state.stack.length - 1].title : 'CircleFTP',
+            inFolder ? state.stack[state.stack.length - 1].title : 'CircleFTP Browser',
             inFolder
         );
         setBreadcrumb(state.stack);
