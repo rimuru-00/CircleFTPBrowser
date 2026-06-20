@@ -168,6 +168,7 @@ body { display: flex; flex-direction: column; }
 /* ─── Action bar ─────────────────────────────────────────────────────────── */
 #actionBar {
     display: none;
+    position: relative;
     flex-direction: column;
     flex-shrink: 0;
     background: var(--surface);
@@ -220,6 +221,41 @@ body { display: flex; flex-direction: column; }
 .ab-icon.active {
     color: var(--accent-lt);
     border-color: var(--accent);
+}
+
+/* ─── Sort dropdown ──────────────────────────────────────────────────────── */
+.sort-menu {
+    position: absolute;
+    top: 100%; right: 12px;
+    margin-top: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    display: none;
+    flex-direction: column;
+    min-width: 172px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5);
+    z-index: 30;
+    animation: menuPop .15s cubic-bezier(0.4,0,0.2,1) both;
+}
+.sort-menu.open { display: flex; }
+.sort-opt {
+    text-align: left;
+    background: none; border: none;
+    color: var(--text); font-family: inherit;
+    font-size: 13px; font-weight: 500;
+    padding: 9px 10px; border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: background .12s;
+}
+.sort-opt:active { background: var(--surface); }
+.sort-opt.active { color: var(--accent-lt); font-weight: 700; }
+.sort-opt.active::after { content: '✓'; font-size: 12px; }
+@keyframes menuPop {
+    from { opacity: 0; transform: translateY(-4px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ─── Scroll content ─────────────────────────────────────────────────────── */
@@ -459,6 +495,34 @@ body { display: flex; flex-direction: column; }
 .tab-btn:active { transform: scale(0.87); }
 .tab-active { color: var(--accent) !important; }
 
+/* ─── Brand footer ────────────────────────────────────────────────────────── */
+#brandFooter {
+    flex-shrink: 0;
+    height: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    position: relative;
+}
+#brandFooter::before {
+    content: '';
+    position: absolute; top: 0; left: 14%; right: 14%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent) 50%, transparent);
+    opacity: .45;
+}
+#brandFooter span {
+    font-size: 9.5px; font-weight: 600; letter-spacing: 1.1px;
+    color: var(--dim); text-transform: uppercase;
+}
+#brandFooter a {
+    color: var(--accent-lt); font-weight: 700;
+    letter-spacing: 1.3px;
+    text-decoration: none;
+    transition: opacity .12s;
+}
+#brandFooter a:active { opacity: .6; }
+
 /* ─── History View ───────────────────────────────────────────────────────── */
 #historyView {
     flex: 1;
@@ -526,6 +590,14 @@ body { display: flex; flex-direction: column; }
         <button class="ab-btn ab-fill"    onclick="playAll()">▶&nbsp; Play All</button>
         <button class="ab-btn ab-outline" id="resumeBtn" onclick="resumePlay()">⏩&nbsp; Resume</button>
         <button class="ab-btn ab-icon"    id="expandBtn" onclick="toggleExpandAll()" title="Expand names">⊞</button>
+        <button class="ab-btn ab-icon"    id="sortBtn" onclick="toggleSortMenu(event)" title="Sort">⇅</button>
+    </div>
+    <div id="sortMenu" class="sort-menu">
+        <button class="sort-opt" data-mode="default"   onclick="applySort('default')">Default order</button>
+        <button class="sort-opt" data-mode="name-asc"  onclick="applySort('name-asc')">Name (A → Z)</button>
+        <button class="sort-opt" data-mode="name-desc" onclick="applySort('name-desc')">Name (Z → A)</button>
+        <button class="sort-opt" data-mode="size-desc" onclick="applySort('size-desc')">Size (Largest)</button>
+        <button class="sort-opt" data-mode="size-asc"  onclick="applySort('size-asc')">Size (Smallest)</button>
     </div>
 </div>
 
@@ -542,6 +614,11 @@ body { display: flex; flex-direction: column; }
 <div id="tabBar">
     <button id="tabBrowse"  class="tab-btn tab-active" onclick="showTab('browse')">📂<span>Browse</span></button>
     <button id="tabHistory" class="tab-btn"            onclick="showTab('history')">🕒<span>History</span></button>
+</div>
+
+<!-- ── Brand footer ───────────────────────────────────────────────────── -->
+<div id="brandFooter">
+    <span>Powered &amp; Developed By <a href="https://t.me/RIMURU_TEMPES_T" onclick="return openBrandLink(event)">Rimuru</a></span>
 </div>
 
 <script>
@@ -584,7 +661,8 @@ const state = {
     activeTab    : 'browse',
     expandAll    : false,
     expandedItems: new Set(),
-    watched      : loadWatchedMap()
+    watched      : loadWatchedMap(),
+    sortMode     : loadSortMode()
 };
 
 // ── WATCH TRACKING ────────────────────────────────────────────────────────────
@@ -865,9 +943,76 @@ function toggleItemExpand(event, idx) {
     if (btn) btn.textContent = expanded ? '⌃' : '⌄';
 }
 
+// ── BRAND LINK ────────────────────────────────────────────────────────────────
+function openBrandLink(e) {
+    if (e) e.preventDefault();
+    const url = 'https://t.me/RIMURU_TEMPES_T';
+    if (window.Android && window.Android.openExternalLink) {
+        window.Android.openExternalLink(url);
+    } else {
+        window.open(url, '_blank');
+    }
+    return false;
+}
+
+// ── SORT ──────────────────────────────────────────────────────────────────────
+const SORT_KEY = 'cftp_sortMode_v1';
+function loadSortMode() {
+    try { return localStorage.getItem(SORT_KEY) || 'default'; } catch (_) { return 'default'; }
+}
+function saveSortMode(mode) {
+    try { localStorage.setItem(SORT_KEY, mode); } catch (_) {}
+}
+function toggleSortMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('sortMenu');
+    const opening = !menu.classList.contains('open');
+    menu.classList.toggle('open', opening);
+    if (opening) {
+        document.querySelectorAll('.sort-opt').forEach(btn =>
+            btn.classList.toggle('active', btn.dataset.mode === state.sortMode)
+        );
+    }
+}
+function closeSortMenu() {
+    document.getElementById('sortMenu').classList.remove('open');
+}
+function applySort(mode) {
+    state.sortMode = mode;
+    saveSortMode(mode);
+    closeSortMenu();
+    renderCurrentItems(true);
+}
+function parseSizeBytes(str) {
+    if (!str) return 0;
+    const m = String(str).match(/^([\d.]+)\s*(B|KB|MB|GB)$/i);
+    if (!m) return 0;
+    let n = parseFloat(m[1]);
+    const u = m[2].toUpperCase();
+    if (u === 'KB') n *= 1024;
+    else if (u === 'MB') n *= 1048576;
+    else if (u === 'GB') n *= 1073741824;
+    return n;
+}
+/** Sort folders and files independently — folders always stay on top,
+ *  files are reordered per the chosen mode. Keeps idx (original index
+ *  into state.items) attached to each pair so click handlers still work. */
+function sortFiltered(pairs, mode) {
+    if (mode === 'default' || pairs.length < 2) return pairs;
+    const dirs  = pairs.filter(p => p.item.isDir);
+    const files = pairs.filter(p => !p.item.isDir);
+    const cmpName = (a, b) => a.item.name.localeCompare(b.item.name, undefined, { numeric: true, sensitivity: 'base' });
+    if (mode === 'name-asc')  files.sort(cmpName);
+    if (mode === 'name-desc') files.sort((a, b) => cmpName(b, a));
+    if (mode === 'size-desc') files.sort((a, b) => parseSizeBytes(b.item.size) - parseSizeBytes(a.item.size));
+    if (mode === 'size-asc')  files.sort((a, b) => parseSizeBytes(a.item.size) - parseSizeBytes(b.item.size));
+    return [...dirs, ...files];
+}
+
 // ── NAVIGATION ────────────────────────────────────────────────────────────────
 function showRoot() {
     if (state.searchActive) closeSearch();
+    closeSortMenu();
     state.stack = []; state.items = [];
     state.expandAll = false; state.expandedItems.clear();
     setHeader('Miru', false);
@@ -916,6 +1061,7 @@ function browseRoot(idx)   { const r = CONFIG.roots[idx]; browse(r.url, r.name);
 
 async function browse(url, title) {
     if (state.searchActive) closeSearch();
+    closeSortMenu();
     state.searchQuery = '';
     state.expandAll = false; state.expandedItems.clear();
     state.stack.push({ url, title });
@@ -976,7 +1122,9 @@ function renderItems(allItems, query, fromSearch = false) {
         return;
     }
 
-    const rows = filtered.map(({ item, idx }, i) => {
+    const display = sortFiltered(filtered, state.sortMode);
+
+    const rows = display.map(({ item, idx }, i) => {
         // No stagger during search or on large lists (300+ items computing
         // individual animation-delay styles blocks the render thread)
         const delay   = (!fromSearch && filtered.length <= 60) ? Math.min(i * 22, 220) : 0;
@@ -1269,6 +1417,10 @@ function setActionBar(items) {
     const expandBtn = document.getElementById('expandBtn');
     if (expandBtn) expandBtn.classList.toggle('active', state.expandAll);
 
+    // Sync sort button state
+    const sortBtn = document.getElementById('sortBtn');
+    if (sortBtn) sortBtn.classList.toggle('active', state.sortMode !== 'default');
+
     el.style.display = 'flex';
 }
 
@@ -1364,6 +1516,7 @@ function browseHistoryItem(url, name) {
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────────
 function showTab(tab) {
     state.activeTab = tab;
+    closeSortMenu();
     const isBrowse  = tab === 'browse';
     document.getElementById('contentWrapper').style.display = isBrowse ? '' : 'none';
     document.getElementById('historyView').style.display = isBrowse ? 'none' : 'block';
@@ -1418,6 +1571,14 @@ document.getElementById('content').addEventListener('scroll', function() {
     clearTimeout(_alphaHideTimer);
     _alphaHideTimer = setTimeout(() => bar.classList.remove('alpha-visible'), 1500);
 }, { passive: true });
+
+// Close the sort dropdown when tapping anywhere outside it
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('sortMenu');
+    if (menu.classList.contains('open') && !menu.contains(e.target) && e.target.id !== 'sortBtn') {
+        closeSortMenu();
+    }
+});
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 // Block native long-press context menu (copy/cut/select) — feels like APK
