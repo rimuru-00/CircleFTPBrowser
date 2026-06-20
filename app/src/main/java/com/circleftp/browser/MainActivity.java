@@ -1,6 +1,7 @@
 package com.circleftp.browser;
 
 import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
@@ -17,10 +18,18 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
+
+    // MX Player free-edition package + activity class, per the official intent spec
+    // (sites.google.com/site/mxvpen/api). Needed verbatim — by name — only to receive
+    // a playback result; everyday launching still works via setPackage() alone.
+    private static final String MX_PACKAGE      = "com.mxtech.videoplayer.ad";
+    private static final String MX_ACTIVITY     = "com.mxtech.videoplayer.ad.ActivityScreen";
+    private static final int    REQ_MX_PLAYBACK = 4242;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -45,6 +54,40 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBackPressed() {
         webView.evaluateJavascript("goBack()", null);
+    }
+
+    /**
+     * Receives MX Player's playback result — IF the installed build still
+     * honors "return_result" the way stock MX Player does (see
+     * openVideoWithPlaylist below for why that's not guaranteed on a
+     * modified APK). When it does fire, we forward position/duration/end_by
+     * straight into the JS layer; window.onPlaybackResult() in index.html
+     * decides what to do with it. If it never fires, nothing breaks — the
+     * app simply keeps the simple tap-to-mark-watched behavior it already had.
+     */
+    @SuppressWarnings("deprecation")
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_MX_PLAYBACK) return;
+
+        try {
+            JSONObject result = new JSONObject();
+            result.put("ok", resultCode == RESULT_OK);
+            if (data != null) {
+                Uri lastUri = data.getData();
+                result.put("uri", lastUri != null ? lastUri.toString() : JSONObject.NULL);
+                if (data.hasExtra("position")) result.put("position", data.getIntExtra("position", -1));
+                if (data.hasExtra("duration")) result.put("duration", data.getIntExtra("duration", -1));
+                String endBy = data.getStringExtra("end_by");
+                result.put("end_by", endBy != null ? endBy : JSONObject.NULL);
+            }
+            final String js = "window.onPlaybackResult && window.onPlaybackResult(" + result.toString() + ")";
+            runOnUiThread(() -> webView.evaluateJavascript(js, null));
+        } catch (Exception ignored) {
+            // A malformed/unexpected result should never crash the app —
+            // worst case, this one playback session just doesn't get tracked.
+        }
     }
 
     // ─── WebView configuration ────────────────────────────────────────────────
@@ -95,6 +138,15 @@ public class MainActivity extends AppCompatActivity {
          * the ClassCastException internally and returns null) instead of crashing.
          * That's why it was falling back to single-video playback with no prev/next.
          *
+         * Position/duration tracking: per the same spec, http/https sources only
+         * return a result (position, duration, end_by) if the intent targets MX
+         * Player's activity by explicit class name, not just by package. We try
+         * that first. If this MX Player build has been modified enough that its
+         * internal class name no longer matches the stock free-edition name, the
+         * explicit-component intent fails to resolve immediately (caught below)
+         * and we fall straight back to the exact intent that has always worked
+         * here — so this change can add tracking, but can never break playback.
+         *
          * @param urlsJson   JSON array of all video URLs in the folder, e.g. ["http://...ep1","http://...ep2",...]
          * @param titlesJson JSON array of matching display names
          * @param startIndex Which item in the list to start playing (0-based)
@@ -118,14 +170,30 @@ public class MainActivity extends AppCompatActivity {
                     // Clamp startIndex just in case
                     int idx = Math.max(0, Math.min(startIndex, count - 1));
 
+                    // ── Attempt 1: explicit component + return_result, so we can
+                    // capture real playback position/duration on exit.
+                    try {
+                        Intent rich = new Intent(Intent.ACTION_VIEW);
+                        rich.setClassName(MX_PACKAGE, MX_ACTIVITY);
+                        rich.setDataAndType(uriArr[idx], "video/*");
+                        rich.putExtra("video_list", uriArr);
+                        rich.putExtra("video_list.name", nameArr);
+                        rich.putExtra("video_list_is_explicit", true);
+                        rich.putExtra("return_result", true);
+                        startActivityForResult(rich, REQ_MX_PLAYBACK);
+                        return;
+                    } catch (ActivityNotFoundException notFound) {
+                        // This build's ActivityScreen class name doesn't match —
+                        // fall through to the known-good path below.
+                    }
+
+                    // ── Attempt 2: same playback, no result. This is exactly
+                    // what's always worked on this device.
                     Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setPackage("com.mxtech.videoplayer.ad");
-                    // setData points to the starting episode — must also be present in video_list
+                    intent.setPackage(MX_PACKAGE);
                     intent.setDataAndType(uriArr[idx], "video/*");
-                    // video_list = full playlist as a real array → MX Player enables prev/next
                     intent.putExtra("video_list", uriArr);
                     intent.putExtra("video_list.name", nameArr);
-                    // Force full-list playback regardless of MX Player's "Back to list" setting
                     intent.putExtra("video_list_is_explicit", true);
                     startActivity(intent);
 
@@ -136,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
                         int idx = Math.max(0, Math.min(startIndex, urlsArr.length() - 1));
                         Intent fallback = new Intent(Intent.ACTION_VIEW);
                         fallback.setDataAndType(Uri.parse(urlsArr.getString(idx)), "video/*");
-                        fallback.setPackage("com.mxtech.videoplayer.ad");
+                        fallback.setPackage(MX_PACKAGE);
                         startActivity(fallback);
                     } catch (Exception ignored) {
                         showToast("Playback error: " + e.getMessage());
