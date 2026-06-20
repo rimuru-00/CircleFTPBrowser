@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Exposes getCacheDir() so FileProvider can hand MX Player a URI
+    to the temporary M3U playlist we write there.
+    The '.' path means the entire cache dir is accessible (fine since
+    we only put one M3U file in there).
+-->
+<paths>
+    <cache-path name="cache" path="." />
+</paths>

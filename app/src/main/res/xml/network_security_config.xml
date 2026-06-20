@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Allows HTTP (not just HTTPS) to reach the CircleFTP server.
+    Android 9+ blocks cleartext traffic by default; this opt-in is required.
+    Scoped to local network addresses for safety — edit if your FTP
+    uses a hostname instead.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
