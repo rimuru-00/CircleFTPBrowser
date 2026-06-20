@@ -27,6 +27,17 @@ android {
     }
 }
 
+// Force all Kotlin stdlib variants to the same version.
+// AndroidX pulls in both kotlin-stdlib:1.8.22 and kotlin-stdlib-jdk8:1.6.0
+// which causes a duplicate class build error — this pins them all to 1.8.22.
+configurations.all {
+    resolutionStrategy {
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+    }
+}
+
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.core:core:1.12.0'
