@@ -12,6 +12,9 @@
     margin: 0; padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 :root {
     --bg:        #07070e;
@@ -105,6 +108,8 @@ body { display: flex; flex-direction: column; }
     color: var(--text);
     font-size: 15px; font-family: inherit;
     caret-color: var(--accent);
+    -webkit-user-select: text;
+    user-select: text;
 }
 #searchInput::placeholder { color: var(--dim); }
 #searchClear {
@@ -768,7 +773,7 @@ function showRoot() {
     if (state.searchActive) closeSearch();
     state.stack = []; state.items = [];
     state.expandAll = false; state.expandedItems.clear();
-    setHeader('CircleFTP Browser', false);
+    setHeader('Miru', false);
     setBreadcrumb([]);
     setActionBar([]);
     const cards = CONFIG.roots.map((r,i) => `
@@ -1165,7 +1170,7 @@ function showTab(tab) {
     if (isBrowse) {
         document.getElementById('hdrBadge').style.display = '';
         const inFolder = state.stack.length > 0;
-        setHeader(inFolder ? state.stack[state.stack.length-1].title : 'CircleFTP Browser', inFolder);
+        setHeader(inFolder ? state.stack[state.stack.length-1].title : 'Miru', inFolder);
         setBreadcrumb(state.stack);
         setActionBar(state.items);
     } else {
@@ -1198,6 +1203,12 @@ function escAttr(s) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+// Block native long-press context menu (copy/cut/select) — feels like APK
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('selectstart', e => {
+    // Allow selection in the search input only
+    if (e.target.id !== 'searchInput') e.preventDefault();
+});
 showRoot();
 </script>
 </body>
