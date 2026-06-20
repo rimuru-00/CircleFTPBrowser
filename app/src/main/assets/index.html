@@ -242,10 +242,12 @@ body { display: flex; flex-direction: column; }
 .fi-dir   { background: rgba(255,167,38,.12); color: var(--folder); }
 .fi-video { background: rgba( 66,165,245,.12); color: var(--video); }
 .fi-watched { background: rgba(76,175,80,.15); color: var(--watched); }
+.fi-progress { background: rgba(255,167,38,.15); color: var(--folder); }
 .finfo { flex: 1; min-width: 0; }
 .fname { font-size: 13.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .fmeta { font-size: 11px; color: var(--dim); margin-top: 3px; }
-.watched-tag { color: var(--watched); }
+.watched-tag  { color: var(--watched); }
+.progress-tag { color: var(--folder); }
 .farrow      { font-size: 18px; color: var(--border); flex-shrink: 0; }
 .farrow-play { color: var(--video); font-size: 14px; }
 
@@ -338,8 +340,9 @@ const CONFIG = {
 
 // ── PERSISTENCE (localStorage) ────────────────────────────────────────────────
 const STORAGE_KEYS = {
-    WATCHED:     'cftp_watched_v1',
-    LAST_FOLDER: 'cftp_lastFolder_v1'
+    WATCHED:      'cftp_watched_v1',
+    LAST_FOLDER:  'cftp_lastFolder_v1',
+    LAST_PLAYLIST:'cftp_lastPlaylist_v1'
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
@@ -348,14 +351,26 @@ const state = {
     items       : [],   // full unfiltered items in current folder
     searchQuery : '',   // current search string
     searchActive: false,
-    watched     : loadWatchedMap()   // { videoUrl: timestampFirstWatched }
+    watched     : loadWatchedMap()   // { videoUrl: record } — see watchRecord() below
 };
 
 /**
- * Watched-episode tracking. Stored as { videoUrl: timestamp } in localStorage
- * so checkmarks and per-folder progress survive app restarts. This is a
- * "tapped it / started it" marker, not real playback-position resume — that
- * would require hooking into MX Player's (possibly modified) internals.
+ * Watched-episode tracking. Stored as { videoUrl: record } in localStorage so
+ * checkmarks/progress survive app restarts.
+ *
+ * record is normally an object: { completed, percent, position, duration, updatedAt }.
+ * Older builds stored a plain timestamp number instead — watchRecord() below
+ * reads those transparently as completed:true so nobody's existing checkmarks
+ * disappear on upgrade.
+ *
+ * "completed" is set two ways:
+ *   1. Optimistically the moment an episode is tapped/started (markWatched) —
+ *      the same simple behavior as before, just per-episode instead of
+ *      blanket-applied to an entire Play All / Shuffle batch.
+ *   2. Authoritatively from MX Player's actual playback result, if the
+ *      installed build still returns one (see onPlaybackResult below) — this
+ *      is what fills in real position/duration and corrects episodes that
+ *      were never actually played.
  */
 function loadWatchedMap() {
     try {
@@ -369,23 +384,114 @@ function persistWatchedMap() {
     catch (_) { /* storage full/unavailable — fail silently, app still works */ }
 }
 
-function isWatched(url) {
-    return !!state.watched[url];
+/** Normalizes a stored entry (object OR legacy timestamp number) into a record shape. */
+function watchRecord(url) {
+    const rec = state.watched[url];
+    if (!rec) return null;
+    if (typeof rec === 'object') return rec;
+    return { completed: true, percent: 100, updatedAt: rec }; // legacy format
 }
 
+/** Optimistic "tapped / started this" marker — may get refined later by a
+ *  real position/duration from recordPlaybackProgress(). */
 function markWatched(url) {
-    if (state.watched[url]) return;
-    state.watched[url] = Date.now();
+    const existing = (typeof state.watched[url] === 'object') ? state.watched[url] : {};
+    state.watched[url] = Object.assign({}, existing, {
+        completed: true,
+        percent: 100,
+        updatedAt: Date.now()
+    });
     persistWatchedMap();
 }
 
-function markManyWatched(urls) {
+/** Records a real per-episode result reported back by MX Player. */
+function recordPlaybackProgress(url, position, duration) {
+    if (!url) return;
+    const hasNums = typeof position === 'number' && position >= 0 &&
+                    typeof duration === 'number' && duration > 0;
+    const percent = hasNums ? Math.max(0, Math.min(100, Math.round((position / duration) * 100))) : 100;
+    state.watched[url] = {
+        completed: !hasNums || percent >= 95,   // missing position/duration = finished normally
+        percent: percent,
+        position: hasNums ? position : undefined,
+        duration: hasNums ? duration : undefined,
+        updatedAt: Date.now()
+    };
+    persistWatchedMap();
+}
+
+/** Marks every URL in the list as fully completed — used when MX Player
+ *  reports the whole launched queue played through to its natural end. */
+function markUrlsCompleted(urls) {
     let changed = false;
     urls.forEach(u => {
-        if (!state.watched[u]) { state.watched[u] = Date.now(); changed = true; }
+        const rec = watchRecord(u);
+        if (!rec || !rec.completed) changed = true;
+        state.watched[u] = { completed: true, percent: 100, updatedAt: Date.now() };
     });
     if (changed) persistWatchedMap();
 }
+
+/**
+ * Remembers the exact sequence of URLs just handed to MX Player (in actual
+ * playback order, starting from wherever playback begins) so that, if a
+ * result comes back later, we know which episodes in THIS session preceded
+ * whichever one was on screen when the user exited. Persisted (not just kept
+ * in memory) because onActivityResult can in principle arrive after Android
+ * has recreated the Activity — that reloads index.html and resets JS state,
+ * but localStorage survives.
+ */
+function saveLastPlaylist(urls) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.LAST_PLAYLIST, JSON.stringify({ urls, startedAt: Date.now() }));
+    } catch (_) { /* ignore */ }
+}
+
+function loadLastPlaylist() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEYS.LAST_PLAYLIST);
+        return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+}
+
+function clearLastPlaylist() {
+    try { localStorage.removeItem(STORAGE_KEYS.LAST_PLAYLIST); }
+    catch (_) { /* ignore */ }
+}
+
+/**
+ * Called from native code (MainActivity#onActivityResult) after the user
+ * returns from MX Player — IF the installed build still honors
+ * "return_result" the way stock MX Player does. On a heavily modified APK
+ * this may simply never fire; everything still works without it, just
+ * without the extra accuracy below.
+ *
+ * result: { ok, uri, position, duration, end_by }
+ */
+window.onPlaybackResult = function (result) {
+    try {
+        if (!result) return;
+        const playlist = loadLastPlaylist();
+        clearLastPlaylist();
+        if (!playlist || !playlist.urls || !playlist.urls.length) return;
+
+        if (result.end_by === 'playback_completion') {
+            // Reached the natural end of everything we handed to MX Player.
+            markUrlsCompleted(playlist.urls);
+        } else if (result.uri) {
+            const idx = playlist.urls.indexOf(result.uri);
+            if (idx > 0) {
+                // Everything earlier in THIS session's sequence played through
+                // before the user reached/left the one MX Player reported.
+                markUrlsCompleted(playlist.urls.slice(0, idx));
+            }
+            if (idx !== -1) {
+                recordPlaybackProgress(result.uri, result.position, result.duration);
+            }
+        }
+        renderCurrentItems();
+    } catch (_) { /* never let a native callback break the UI */ }
+};
 
 /**
  * "Continue Browsing" — remembers the deepest folder the user navigated into,
@@ -756,14 +862,30 @@ function renderItems(allItems, query) {
             </div>`;
         }
         if (item.isVideo) {
-            const watched = isWatched(item.url);
+            const rec       = watchRecord(item.url);
+            const completed = !!(rec && rec.completed);
+            const percent   = rec ? (completed ? 100 : (rec.percent || 0)) : 0;
+            const inProgress = !completed && percent > 0;
+
+            let iconClass = 'fi-video';
+            let iconGlyph = '▶';
+            let tagHtml   = '';
+            if (completed) {
+                iconClass += ' fi-watched';
+                iconGlyph  = '✓';
+                tagHtml    = ' · <span class="watched-tag">Watched</span>';
+            } else if (inProgress) {
+                iconClass += ' fi-progress';
+                tagHtml    = ` · <span class="progress-tag">${percent}% watched</span>`;
+            }
+
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
             return `
             <div class="fitem" onclick="clickItem(${idx})">
-                <div class="ficon fi-video${watched ? ' fi-watched' : ''}">${watched ? '✓' : '▶'}</div>
+                <div class="ficon ${iconClass}">${iconGlyph}</div>
                 <div class="finfo">
                     <div class="fname">${highlightName(item.name, hlRegex)}</div>
-                    <div class="fmeta">${meta}${watched ? ' · <span class="watched-tag">Watched</span>' : ''}</div>
+                    <div class="fmeta">${meta}${tagHtml}</div>
                 </div>
                 <div class="farrow farrow-play">▶</div>
             </div>`;
@@ -801,8 +923,13 @@ function clickItem(idx) {
         // Build full ordered video list from the unfiltered state.items
         const allVideos = state.items.filter(i => i.isVideo);
         const startAt   = allVideos.findIndex(v => v.url === item.url);
+        // What MX Player will actually play forward through this session —
+        // NOT the whole season, just from the tapped episode onward. Earlier
+        // episodes weren't touched and shouldn't get marked from this tap.
+        const playSeq   = allVideos.slice(Math.max(0, startAt));
 
         markWatched(item.url);
+        saveLastPlaylist(playSeq.map(v => v.url));
         renderCurrentItems();
 
         if (window.Android) {
@@ -849,7 +976,12 @@ function jumpToBreadcrumb(idx) {
 function playAll() {
     const videos = state.items.filter(i => i.isVideo);
     if (!videos.length) return;
-    markManyWatched(videos.map(v => v.url));
+    // Only the episode that's actually about to start gets an optimistic
+    // mark. The rest get filled in for real if/when MX Player reports back
+    // how far the user actually got — no more "tapped Play All, instantly
+    // 12/12 watched" before anything's played.
+    markWatched(videos[0].url);
+    saveLastPlaylist(videos.map(v => v.url));
     renderCurrentItems();
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
@@ -869,7 +1001,8 @@ function shufflePlay() {
         const j = Math.floor(Math.random() * (i + 1));
         [videos[i], videos[j]] = [videos[j], videos[i]];
     }
-    markManyWatched(videos.map(v => v.url));
+    markWatched(videos[0].url);
+    saveLastPlaylist(videos.map(v => v.url));
     renderCurrentItems();
     if (window.Android) {
         window.Android.openVideoWithPlaylist(
@@ -915,7 +1048,7 @@ function setBreadcrumb(stack) {
 /**
  * Shows/hides the action bar (Play All / Shuffle + progress row).
  * Accepts the FULL unfiltered items array for the current folder
- * (or [] / false to hide) — computes video count + watched count from it.
+ * (or [] / false to hide) — computes completed/in-progress counts from it.
  */
 function setActionBar(items) {
     const el = document.getElementById('actionBar');
@@ -926,11 +1059,21 @@ function setActionBar(items) {
         return;
     }
 
-    const watchedCount = videos.filter(v => isWatched(v.url)).length;
-    const pct = Math.round((watchedCount / videos.length) * 100);
+    let completedCount  = 0;
+    let inProgressCount = 0;
+    videos.forEach(v => {
+        const rec = watchRecord(v.url);
+        if (rec && rec.completed) completedCount++;
+        else if (rec && rec.percent > 0) inProgressCount++;
+    });
 
-    document.getElementById('progressText').textContent =
-        `${watchedCount} / ${videos.length} episode${videos.length === 1 ? '' : 's'} watched`;
+    const pct = Math.round((completedCount / videos.length) * 100);
+    let text  = `${completedCount} / ${videos.length} episode${videos.length === 1 ? '' : 's'} watched`;
+    if (inProgressCount > 0) {
+        text += ` · ${inProgressCount} in progress`;
+    }
+
+    document.getElementById('progressText').textContent = text;
     document.getElementById('progressFill').style.width = pct + '%';
 
     el.style.display = 'flex';
