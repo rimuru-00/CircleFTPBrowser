@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Adaptive icon background — matches the white backdrop already
+         painted into the source artwork, so the launcher mask edge (circle/
+         squircle/rounded-square depending on device) doesn't show a seam. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>
