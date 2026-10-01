@@ -388,6 +388,7 @@ body { display: flex; flex-direction: column; }
     animation: slideInX 0.2s ease both;
 }
 .fitem:active { background: var(--surface2); }
+.lp-press { background: var(--surface2) !important; transform: scale(.985); transition: transform .12s ease; }
 
 /* Expanded name state */
 .fitem.ex {
@@ -1081,7 +1082,7 @@ function showRoot() {
     setBreadcrumb([]);
     setActionBar([]);
     const cards = CONFIG.roots.map((r,i) => `
-        <div class="root-card" style="animation-delay:${80+i*55}ms" onclick="browseRoot(${i})">
+        <div class="root-card" data-url="${esc(r.url)}" style="animation-delay:${80+i*55}ms" onclick="browseRoot(${i})">
             <div class="root-icon">${r.icon}</div>
             <div class="root-info">
                 <div class="root-name">${esc(r.name)}</div>
@@ -1100,7 +1101,7 @@ function buildContinueCard() {
     const pathLabel = last.map(s => s.title).join(' › ');
     const safePath  = pathLabel.length > 60 ? '…' + pathLabel.slice(-58) : pathLabel;
     return `
-    <div class="continue-card" onclick="continueBrowsing()">
+    <div class="continue-card" data-url="${esc(deepest.url)}" onclick="continueBrowsing()">
         <div class="continue-icon">⏵</div>
         <div class="continue-info">
             <div class="continue-label">Continue Browsing</div>
@@ -1198,7 +1199,7 @@ function renderItems(allItems, query, fromSearch = false) {
         const expBtn  = `<button class="expand-btn" onclick="event.stopPropagation();toggleItemExpand(event,${idx})" title="Expand name">${isEx ? '⌃' : '⌄'}</button>`;
 
         if (item.isDir) {
-            return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
+            return `<div class="fitem${isEx}" data-idx="${idx}" data-url="${esc(item.url)}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
                     <div class="fname">${highlightName(item.name, hlRegex)}</div>
@@ -1217,7 +1218,7 @@ function renderItems(allItems, query, fromSearch = false) {
             if (completed)       { iconClass += ' fi-watched';  iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
             else if (inProgress) { iconClass += ' fi-progress'; tagHtml = ` · <span class="progress-tag">${percent}% watched</span>`; }
             const meta = item.size ? `Video · ${esc(item.size)}` : 'Video';
-            return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
+            return `<div class="fitem${isEx}" data-idx="${idx}" data-url="${esc(item.url)}" style="animation-delay:${delay}ms" onclick="clickItem(${idx})">
                 <div class="ficon ${iconClass}">${iconGlyph}</div>
                 <div class="finfo">
                     <div class="fname">${highlightName(item.name, hlRegex)}</div>
@@ -1227,7 +1228,7 @@ function renderItems(allItems, query, fromSearch = false) {
                 <div class="farrow farrow-play">▶</div>
             </div>`;
         }
-        return `<div class="fitem${isEx}" data-idx="${idx}" style="animation-delay:${delay}ms;opacity:.4;cursor:default">
+        return `<div class="fitem${isEx}" data-idx="${idx}" data-url="${esc(item.url)}" style="animation-delay:${delay}ms;opacity:.4;cursor:default">
             <div class="ficon" style="background:rgba(115,115,115,.08);color:var(--dim)">📄</div>
             <div class="finfo">
                 <div class="fname">${esc(item.name)}</div>
@@ -1532,7 +1533,7 @@ function renderHistory() {
         const delay    = Math.min(i * 22, 220);
         const isFolder = (entry.type || 'video') === 'folder';
         if (isFolder) {
-            return `<div class="fitem" style="animation-delay:${delay}ms" onclick="browseHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
+            return `<div class="fitem" data-url="${esc(entry.url)}" style="animation-delay:${delay}ms" onclick="browseHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
                 <div class="ficon fi-dir">📁</div>
                 <div class="finfo">
                     <div class="fname">${esc(entry.name)}</div>
@@ -1548,7 +1549,7 @@ function renderHistory() {
         let iconClass = 'fi-video', iconGlyph = '▶', tagHtml = '';
         if (completed)   { iconClass = 'fi-video fi-watched'; iconGlyph = '✓'; tagHtml = ' · <span class="watched-tag">Watched</span>'; }
         else if (inProgress) { iconClass = 'fi-video fi-progress'; tagHtml = ` · <span class="progress-tag">${percent}% watched</span>`; }
-        return `<div class="fitem" style="animation-delay:${delay}ms" onclick="playHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
+        return `<div class="fitem" data-url="${esc(entry.url)}" style="animation-delay:${delay}ms" onclick="playHistoryItem('${escAttr(entry.url)}','${escAttr(entry.name)}')">
             <div class="ficon ${iconClass}">${iconGlyph}</div>
             <div class="finfo">
                 <div class="fname">${esc(entry.name)}</div>
@@ -1645,6 +1646,55 @@ document.addEventListener('click', function(e) {
         closeSortMenu();
     }
 });
+
+// ── LONG-PRESS → COPY URL ─────────────────────────────────────────────────────
+// Hold any row that has a URL (folder, episode, history entry, server card).
+// 500 ms = Android's standard long-press time: long enough that normal taps and
+// scroll starts never trigger it, short enough to feel instant. Moving more than
+// 10 px (a scroll) cancels it. The tap that would normally follow is swallowed.
+(function () {
+    const HOLD_MS = 500, MOVE_TOL = 10;
+    let timer = null, startX = 0, startY = 0, target = null, fired = false, blockClickUntil = 0;
+
+    function copyUrl(url) {
+        try {
+            if (window.Android && Android.copyText) { Android.copyText(url); return; }
+        } catch (_) {}
+        try { navigator.clipboard.writeText(url); } catch (_) {}
+    }
+    function buzz() {
+        try { if (window.Android && Android.haptic) { Android.haptic(); return; } } catch (_) {}
+        try { navigator.vibrate && navigator.vibrate(25); } catch (_) {}
+    }
+    function cancel() { if (timer) { clearTimeout(timer); timer = null; } if (target) target.classList.remove('lp-press'); }
+
+    document.addEventListener('pointerdown', e => {
+        fired = false;
+        if (e.target.closest('button, input')) return;
+        const row = e.target.closest('[data-url]');
+        if (!row || !row.dataset.url) return;
+        target = row; startX = e.clientX; startY = e.clientY;
+        timer = setTimeout(() => {
+            timer = null; fired = true;
+            row.classList.add('lp-press');
+            buzz();
+            copyUrl(row.dataset.url);
+            dbg('D', 'long-press copied: ' + row.dataset.url);
+            setTimeout(() => row.classList.remove('lp-press'), 350);
+        }, HOLD_MS);
+    }, true);
+    document.addEventListener('pointermove', e => {
+        if (timer && (Math.abs(e.clientX - startX) > MOVE_TOL || Math.abs(e.clientY - startY) > MOVE_TOL)) cancel();
+    }, true);
+    ['pointerup', 'pointercancel'].forEach(ev => document.addEventListener(ev, () => {
+        if (fired) blockClickUntil = Date.now() + 400;   // swallow the click that follows release
+        if (timer) cancel();
+    }, true));
+    // Swallow the click that would open the folder / start the video after a long press
+    document.addEventListener('click', e => {
+        if (Date.now() < blockClickUntil) { e.preventDefault(); e.stopPropagation(); blockClickUntil = 0; }
+    }, true);
+})();
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 // Block native long-press context menu (copy/cut/select) — feels like APK
