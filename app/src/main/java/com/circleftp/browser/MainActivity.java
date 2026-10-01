@@ -2,11 +2,15 @@ package com.circleftp.browser;
 
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -20,6 +24,22 @@ import androidx.appcompat.app.AppCompatActivity;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
@@ -30,6 +50,80 @@ public class MainActivity extends AppCompatActivity {
     private static final String MX_PACKAGE      = "com.mxtech.videoplayer.ad";
     private static final String MX_ACTIVITY     = "com.mxtech.videoplayer.ad.ActivityScreen";
     private static final int    REQ_MX_PLAYBACK = 4242;
+
+    // ─── Logging ──────────────────────────────────────────────────────────────
+    // Every line goes to logcat (tag "CircleFTP") AND to a rolling file inside
+    // the app's private storage, so the user can copy it from the in-app
+    // "Show log" button and paste it for diagnosis.
+
+    private static final String TAG = "CircleFTP";
+    private static final long   LOG_MAX_BYTES = 200 * 1024;
+    private final Object logLock = new Object();
+
+    private File logFile() { return new File(getFilesDir(), "circleftp_log.txt"); }
+
+    private void logLine(String level, String msg) {
+        String line = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(new Date())
+                + " [" + level + "] " + msg;
+        if ("E".equals(level)) Log.e(TAG, msg); else Log.d(TAG, msg);
+        synchronized (logLock) {
+            try {
+                File f = logFile();
+                if (f.exists() && f.length() > LOG_MAX_BYTES) f.delete();   // simple rollover
+                try (FileWriter w = new FileWriter(f, true)) { w.write(line + "\n"); }
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private static String stackOf(Throwable t) {
+        StringWriter sw = new StringWriter();
+        t.printStackTrace(new PrintWriter(sw));
+        return sw.toString();
+    }
+
+    private String readLog() {
+        synchronized (logLock) {
+            try {
+                File f = logFile();
+                if (!f.exists()) return "(log is empty)";
+                byte[] b = new byte[(int) f.length()];
+                try (java.io.FileInputStream in = new java.io.FileInputStream(f)) { in.read(b); }
+                return new String(b, StandardCharsets.UTF_8);
+            } catch (Exception e) { return "Could not read log: " + e; }
+        }
+    }
+
+    /** DNS + raw TCP probe — tells us WHERE a connection fails (name, route, port). */
+    private void probeHost(String urlStr) {
+        try {
+            URL u = new URL(urlStr);
+            int port = u.getPort() != -1 ? u.getPort() : u.getDefaultPort();
+            long t0 = System.currentTimeMillis();
+            InetAddress[] addrs;
+            try {
+                addrs = InetAddress.getAllByName(u.getHost());
+            } catch (Exception e) {
+                logLine("E", "PROBE DNS FAILED for " + u.getHost() + " -> " + e);
+                return;
+            }
+            StringBuilder sb = new StringBuilder();
+            for (InetAddress a : addrs) sb.append(a.getHostAddress()).append(' ');
+            logLine("D", "PROBE DNS " + u.getHost() + " -> " + sb.toString().trim()
+                    + " (" + (System.currentTimeMillis() - t0) + " ms)");
+            for (InetAddress a : addrs) {
+                long t1 = System.currentTimeMillis();
+                try (Socket sock = new Socket()) {
+                    sock.connect(new InetSocketAddress(a, port), 7000);
+                    logLine("D", "PROBE TCP " + a.getHostAddress() + ":" + port + " OK ("
+                            + (System.currentTimeMillis() - t1) + " ms)");
+                } catch (Exception e) {
+                    logLine("E", "PROBE TCP " + a.getHostAddress() + ":" + port + " FAILED -> " + e);
+                }
+            }
+        } catch (Exception e) {
+            logLine("E", "PROBE error: " + e);
+        }
+    }
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -47,6 +141,8 @@ public class MainActivity extends AppCompatActivity {
         configureWebView();
 
         webView.addJavascriptInterface(new BrowserBridge(), "Android");
+        logLine("D", "App start | Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ") | "
+                + Build.MANUFACTURER + " " + Build.MODEL);
         webView.loadUrl("file:///android_asset/index.html");
     }
 
@@ -210,6 +306,103 @@ public class MainActivity extends AppCompatActivity {
                         showToast("Playback error: " + e.getMessage());
                     }
                 }
+            });
+        }
+
+
+        /**
+         * Native directory fetch. Does the HTTP request in Java instead of the
+         * WebView's fetch(), so it is immune to WebView CORS / mixed-content /
+         * private-network-access blocking (the usual cause of a bare
+         * "Failed to fetch"). Follows redirects itself — including http -> https
+         * — and reports the REAL error (DNS, timeout, SSL, HTTP code).
+         *
+         * Result is delivered asynchronously to window.__nativeFetchDone(id, json)
+         * where json = {ok, status, finalUrl, body} or {ok:false, error}.
+         */
+        @JavascriptInterface
+        public void fetchText(final String url, final String callbackId) {
+            new Thread(() -> {
+                JSONObject out = new JSONObject();
+                long t0 = System.currentTimeMillis();
+                logLine("D", "FETCH start " + url);
+                try {
+                    String current = url;
+                    HttpURLConnection conn = null;
+                    int status = 0;
+                    for (int hop = 0; hop < 8; hop++) {
+                        conn = (HttpURLConnection) new URL(current).openConnection();
+                        conn.setInstanceFollowRedirects(false);   // we handle redirects (http<->https)
+                        conn.setConnectTimeout(15000);
+                        conn.setReadTimeout(30000);
+                        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) CircleFTPBrowser");
+                        conn.setRequestProperty("Accept", "text/html,*/*");
+                        status = conn.getResponseCode();
+                        logLine("D", "FETCH hop " + hop + " " + current + " -> HTTP " + status);
+                        if (status >= 300 && status < 400) {
+                            String loc = conn.getHeaderField("Location");
+                            conn.disconnect();
+                            if (loc == null) throw new Exception("Redirect without Location (HTTP " + status + ")");
+                            current = new URL(new URL(current), loc).toString();
+                            logLine("D", "FETCH redirect -> " + current);
+                            continue;
+                        }
+                        break;
+                    }
+                    if (status < 200 || status >= 300) {
+                        logLine("E", "FETCH bad status " + status + " for " + current);
+                        out.put("ok", false);
+                        out.put("error", "HTTP " + status);
+                    } else {
+                        InputStream in = conn.getInputStream();
+                        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                        byte[] chunk = new byte[16384];
+                        int n;
+                        while ((n = in.read(chunk)) != -1) buf.write(chunk, 0, n);
+                        in.close();
+                        logLine("D", "FETCH OK " + buf.size() + " bytes in "
+                                + (System.currentTimeMillis() - t0) + " ms | final=" + current);
+                        out.put("ok", true);
+                        out.put("status", status);
+                        out.put("finalUrl", current);
+                        out.put("body", new String(buf.toByteArray(), StandardCharsets.UTF_8));
+                    }
+                    conn.disconnect();
+                } catch (Exception e) {
+                    logLine("E", "FETCH FAILED " + url + " after " + (System.currentTimeMillis() - t0)
+                            + " ms\n" + stackOf(e));
+                    probeHost(url);
+                    try {
+                        out.put("ok", false);
+                        out.put("error", e.getClass().getSimpleName() + ": " + e.getMessage());
+                    } catch (Exception ignored) {}
+                }
+                final String js = "window.__nativeFetchDone && window.__nativeFetchDone("
+                        + JSONObject.quote(callbackId) + "," + JSONObject.quote(out.toString()) + ")";
+                runOnUiThread(() -> webView.evaluateJavascript(js, null));
+            }).start();
+        }
+
+        /** JS -> native logging (so JS-side errors land in the same log). */
+        @JavascriptInterface
+        public void jsLog(String level, String msg) { logLine(level, "JS: " + msg); }
+
+        /** Returns the whole log text for the in-app log viewer. */
+        @JavascriptInterface
+        public String getLog() { return readLog(); }
+
+        @JavascriptInterface
+        public void clearLog() {
+            synchronized (logLock) { logFile().delete(); }
+        }
+
+        /** Copies text to the clipboard so it can be pasted into a chat. */
+        @JavascriptInterface
+        public void copyText(String text) {
+            runOnUiThread(() -> {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("CircleFTP log", text));
+                Toast.makeText(MainActivity.this, "Log copied", Toast.LENGTH_SHORT).show();
             });
         }
 
