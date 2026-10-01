@@ -463,6 +463,12 @@ body { display: flex; flex-direction: column; }
 }
 .retry-btn:active { background: var(--surface2); }
 .err-msg { font-size: 12px; color: var(--dim); word-break: break-word; }
+.err-row { display:flex; gap:10px; }
+#logOverlay { position:fixed; inset:0; z-index:9999; background:rgba(5,5,12,.97); display:none; flex-direction:column; }
+#logOverlay.open { display:flex; }
+#logBar { display:flex; gap:8px; padding:12px; padding-top:calc(12px + env(safe-area-inset-top,0px)); border-bottom:1px solid var(--surface2); }
+#logBar button { flex:1; padding:10px; border-radius:10px; border:1px solid var(--surface2); background:var(--surface); color:#fff; font-size:13px; }
+#logText { flex:1; margin:0; padding:12px; overflow:auto; font:11px/1.45 monospace; color:#cfd2ff; white-space:pre-wrap; word-break:break-all; }
 .no-results { font-size: 30px; margin-bottom: 4px; }
 
 /* ─── Tab bar ─────────────────────────────────────────────────────────────── */
@@ -616,6 +622,17 @@ body { display: flex; flex-direction: column; }
     <button id="tabHistory" class="tab-btn"            onclick="showTab('history')">🕒<span>History</span></button>
 </div>
 
+<!-- ── Log viewer ─────────────────────────────────────────────────────── -->
+<div id="logOverlay">
+    <div id="logBar">
+        <button onclick="copyLog()">Copy</button>
+        <button onclick="refreshLog()">Refresh</button>
+        <button onclick="clearLogView()">Clear</button>
+        <button onclick="closeLog()">Close</button>
+    </div>
+    <pre id="logText"></pre>
+</div>
+
 <!-- ── Brand footer ───────────────────────────────────────────────────── -->
 <div id="brandFooter">
     <span>Powered &amp; Developed By <a href="https://t.me/RIMURU_TEMPES_T" onclick="return openBrandLink(event)">Rimuru</a></span>
@@ -752,6 +769,17 @@ function clearLastFolder() {
     try { localStorage.removeItem(STORAGE_KEYS.LAST_FOLDER); } catch (_) {}
 }
 
+// ── DEBUG LOG ─────────────────────────────────────────────────────────────────
+function dbg(level, msg) { try { if (window.Android && Android.jsLog) Android.jsLog(level, String(msg)); } catch (_) {} }
+window.addEventListener('error', e => dbg('E', 'window.onerror: ' + e.message + ' @' + (e.filename||'') + ':' + (e.lineno||'')));
+window.addEventListener('unhandledrejection', e => dbg('E', 'unhandledrejection: ' + (e.reason && e.reason.message || e.reason)));
+function getLogText() { try { return (window.Android && Android.getLog) ? Android.getLog() : '(log only available inside the app)'; } catch (e) { return 'log error: ' + e; } }
+function showLog()  { document.getElementById('logText').textContent = getLogText(); document.getElementById('logOverlay').classList.add('open'); const t = document.getElementById('logText'); t.scrollTop = t.scrollHeight; }
+function refreshLog() { showLog(); }
+function closeLog() { document.getElementById('logOverlay').classList.remove('open'); }
+function copyLog()  { try { Android.copyText(getLogText()); } catch (_) {} }
+function clearLogView() { try { Android.clearLog(); } catch (_) {} showLog(); }
+
 // ── FOLDER CACHE ──────────────────────────────────────────────────────────────
 // Avoids re-fetching folders the user already visited. Back navigation and
 // breadcrumb jumps become instant. TTL = 5 min so stale content auto-expires.
@@ -766,11 +794,37 @@ function isVideoFile(name) {
 async function fetchDirectory(url) {
     const hit = _folderCache.get(url);
     if (hit && Date.now() - hit.ts < CACHE_TTL) return hit.items;
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = parseH5aiHtml(await res.text(), url);
+    let html, baseUrl = url;
+    if (window.Android && typeof Android.fetchText === 'function') {
+        // Native (Java) request: no CORS / mixed-content / redirect problems,
+        // and the error message is the real cause instead of "Failed to fetch".
+        const r = await nativeFetch(url);
+        html = r.body; baseUrl = r.finalUrl || url;
+    } else {
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        html = await res.text(); baseUrl = res.url || url;
+    }
+    const items = parseH5aiHtml(html, baseUrl);
     _folderCache.set(url, { items, ts: Date.now() });
     return items;
+}
+const _nativePending = new Map();
+let _nativeSeq = 0;
+window.__nativeFetchDone = function (id, json) {
+    const p = _nativePending.get(id);
+    if (!p) return;
+    _nativePending.delete(id);
+    let r;
+    try { r = JSON.parse(json); } catch (_) { r = { ok: false, error: 'Bad native response' }; }
+    r.ok ? p.resolve(r) : p.reject(new Error(r.error || 'Network error'));
+};
+function nativeFetch(url) {
+    return new Promise((resolve, reject) => {
+        const id = 'f' + (++_nativeSeq);
+        _nativePending.set(id, { resolve, reject });
+        Android.fetchText(url, id);
+    });
 }
 function parseH5aiHtml(html, baseUrl) {
     const origin = new URL(baseUrl).origin;
@@ -1090,6 +1144,7 @@ async function browse(url, title) {
         saveLastFolder(state.stack);
         saveToHistory(url, title, 'folder');
     } catch (err) {
+        dbg('E', 'browse failed: ' + url + ' -> ' + err.message);
         state.stack.pop();
         setBreadcrumb(state.stack);
         const safeUrl = escAttr(url), safeTitle = escAttr(title);
@@ -1097,7 +1152,10 @@ async function browse(url, title) {
             <div style="font-size:28px">⚠️</div>
             <span>Could not load folder</span>
             <span class="err-msg">${esc(err.message)}</span>
-            <button class="retry-btn" onclick="browse('${safeUrl}','${safeTitle}')">Retry</button>
+            <div class="err-row">
+                <button class="retry-btn" onclick="browse('${safeUrl}','${safeTitle}')">Retry</button>
+                <button class="retry-btn" onclick="showLog()">Show log</button>
+            </div>
         </div>`);
     }
 }
