@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.HapticFeedbackConstants;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
@@ -422,13 +423,19 @@ public class MainActivity extends AppCompatActivity {
             synchronized (logLock) { logFile().delete(); }
         }
 
-        /** Copies text to the clipboard so it can be pasted into a chat. */
+        /** Short vibration tick to confirm a long-press. No permission needed. */
+        @JavascriptInterface
+        public void haptic() {
+            runOnUiThread(() -> webView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS));
+        }
+
+        /** Copies text (a URL or the log) to the clipboard. */
         @JavascriptInterface
         public void copyText(String text) {
             runOnUiThread(() -> {
                 ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("CircleFTP log", text));
-                Toast.makeText(MainActivity.this, "Log copied", Toast.LENGTH_SHORT).show();
+                if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("CircleFTP", text));
+                Toast.makeText(MainActivity.this, "Copied", Toast.LENGTH_SHORT).show();
             });
         }
 
