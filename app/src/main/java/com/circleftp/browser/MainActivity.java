@@ -44,6 +44,9 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
 
+    // DNS-independent networking: DoH lookup + loopback relay when system DNS fails.
+    private final DnsFallback dns = new DnsFallback((lvl, msg) -> logLine(lvl, msg));
+
     // MX Player free-edition package + activity class, per the official intent spec
     // (sites.google.com/site/mxvpen/api). Needed verbatim — by name — only to receive
     // a playback result; everyday launching still works via setPackage() alone.
@@ -172,7 +175,7 @@ public class MainActivity extends AppCompatActivity {
             result.put("ok", resultCode == RESULT_OK);
             if (data != null) {
                 Uri lastUri = data.getData();
-                result.put("uri", lastUri != null ? lastUri.toString() : JSONObject.NULL);
+                result.put("uri", lastUri != null ? dns.unroute(lastUri.toString()) : JSONObject.NULL);
                 if (data.hasExtra("position")) result.put("position", data.getIntExtra("position", -1));
                 if (data.hasExtra("duration")) result.put("duration", data.getIntExtra("duration", -1));
                 String endBy = data.getStringExtra("end_by");
@@ -248,7 +251,30 @@ public class MainActivity extends AppCompatActivity {
          * @param startIndex Which item in the list to start playing (0-based)
          */
         @JavascriptInterface
-        public void openVideoWithPlaylist(String urlsJson, String titlesJson, int startIndex) {
+        public void openVideoWithPlaylist(final String urlsJson, final String titlesJson, final int startIndex) {
+            // DNS lookups must not run on the UI thread: route URLs in the background first.
+            new Thread(() -> {
+                String routed = urlsJson;
+                try {
+                    JSONArray in = new JSONArray(urlsJson);
+                    JSONArray outArr = new JSONArray();
+                    for (int i = 0; i < in.length(); i++) {
+                        String u = in.getString(i);
+                        try { outArr.put(dns.route(u)); }
+                        catch (Exception e) {
+                            logLine("E", "route failed for playback URL, using original: " + e);
+                            outArr.put(u);
+                        }
+                    }
+                    routed = outArr.toString();
+                } catch (Exception e) {
+                    logLine("E", "playlist routing error: " + e);
+                }
+                launchPlayer(routed, titlesJson, startIndex);
+            }).start();
+        }
+
+        private void launchPlayer(String urlsJson, String titlesJson, int startIndex) {
             runOnUiThread(() -> {
                 try {
                     JSONArray urlsArr   = new JSONArray(urlsJson);
@@ -331,7 +357,7 @@ public class MainActivity extends AppCompatActivity {
                     HttpURLConnection conn = null;
                     int status = 0;
                     for (int hop = 0; hop < 8; hop++) {
-                        conn = (HttpURLConnection) new URL(current).openConnection();
+                        conn = (HttpURLConnection) new URL(dns.route(current)).openConnection();
                         conn.setInstanceFollowRedirects(false);   // we handle redirects (http<->https)
                         conn.setConnectTimeout(15000);
                         conn.setReadTimeout(30000);
